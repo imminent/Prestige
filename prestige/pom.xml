@@ -44,6 +44,11 @@
 			<groupId>org.reflections</groupId>
 			<artifactId>reflections</artifactId>
 		</dependency>
+		<!-- FreeMaker: Template Generator -->
+		<dependency>
+			<groupId>org.freemarker</groupId>
+  			<artifactId>freemarker</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -61,6 +66,7 @@
 				<artifactId>maven-invoker-plugin</artifactId>
 				<configuration>
 					<addTestClassPath>true</addTestClassPath>
+					<projectsDirectory>src/integration-tests</projectsDirectory>
 					<cloneProjectsTo>${project.build.directory}/integration-tests</cloneProjectsTo>
 					<pomIncludes>
 						<pomInclude>*/pom.xml</pomInclude>

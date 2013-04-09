@@ -15,6 +15,6 @@ import javax.annotation.meta.TypeQualifierNickname;
 @Documented
 @TypeQualifierNickname
 @ControllerImplementation(PRODUCTION)
-@Retention(RetentionPolicy.RUNTIME)
+@Retention(RetentionPolicy.SOURCE)
 public @interface ProductionController {
 }

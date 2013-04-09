@@ -5,7 +5,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 import javax.annotation.meta.TypeQualifier;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter.DEFAULT;
 
 import android.app.Activity;
 
@@ -17,7 +16,9 @@ import android.app.Activity;
  */
 @Documented
 @TypeQualifier(applicableTo = Activity.class)
-@Retention(RetentionPolicy.RUNTIME)
+@Retention(RetentionPolicy.SOURCE)
 public @interface Presentation {
-    Class<?> protocol() default DEFAULT.class;
+    Class<?> protocol() default NoProtocol.class;
+    
+    public interface NoProtocol { }
 }

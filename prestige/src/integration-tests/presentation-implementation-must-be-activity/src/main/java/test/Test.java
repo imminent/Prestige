@@ -6,5 +6,5 @@ public class Test {
 	@Presentation
 	public interface Inner { }
 	
-	public static final class Implementation implements Inner;
+	public static final class Implementation implements Inner { };
 }

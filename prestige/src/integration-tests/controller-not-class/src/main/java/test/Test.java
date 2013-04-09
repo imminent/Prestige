@@ -5,8 +5,10 @@ import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Presentation;
 
 public class Test {
-	@Controller(PresentationInterface.class)
-	public static class Inner implements ControllerContract { }
+	@Controller(presentation = PresentationInterface.class)
+	public static class Inner implements ControllerContract { 
+		public void attachPresentation(Object presentation) { }
+	}
 	
 	@Presentation
 	public interface PresentationInterface { }

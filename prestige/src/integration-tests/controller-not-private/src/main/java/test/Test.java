@@ -5,7 +5,7 @@ import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Presentation;
 
 public class Test {
-	@Controller(PresentationInterface.class)
+	@Controller(presentation = PresentationInterface.class)
 	private interface Inner extends ControllerContract { }
 	
 	@Presentation

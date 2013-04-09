@@ -36,6 +36,7 @@
 		<dagger.version>0.9.1</dagger.version>
 		<butterknife.version>1.3.0</butterknife.version>
 		<reflections.version>0.9.9-RC1</reflections.version>
+		<free-maker.version>2.3.19</free-maker.version>
 
 		<!-- Plugins -->
 		<maven-compiler-plugin.version>3.0</maven-compiler-plugin.version>
@@ -79,6 +80,12 @@
 				<groupId>org.reflections</groupId>
 				<artifactId>reflections</artifactId>
 				<version>${reflections.version}</version>
+			</dependency>
+			<!-- FreeMaker: Template Generator -->
+			<dependency>
+				<groupId>org.freemarker</groupId>
+	  			<artifactId>freemarker</artifactId>
+	  			<version>${free-maker.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
