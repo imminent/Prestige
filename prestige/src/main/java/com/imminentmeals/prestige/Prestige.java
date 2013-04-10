@@ -3,7 +3,7 @@ package com.imminentmeals.prestige;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static javax.lang.model.element.ElementKind.INTERFACE;
-import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 import java.io.IOException;
@@ -11,6 +11,8 @@ import java.io.Writer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -29,7 +31,10 @@ import org.reflections.Reflections;
 
 import android.app.Activity;
 
+import com.google.common.base.CaseFormat;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.Closeables;
 import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Controller.Default;
 import com.imminentmeals.prestige.annotations.Presentation;
@@ -77,11 +82,14 @@ public final class Prestige {
 			final List<PresentationControllerBinding> presentation_controller_bindings = newArrayList();
 			
 			// Process the @Presentation annotations
-			processPresentations(environment, imports);
+			final ImmutableMap<Element, Element> presentation_protocols = processPresentations(environment, imports);
+			
+			System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
+			System.out.println("Presentations -> Protocols is " + Joiner.on(", ").join(presentation_protocols.entrySet()));
 			
 			// Process the @Controller annotations and @ControllerImplementation annotations per @Controller annotation
-			processControllers(environment, imports, presentation_controller_bindings);
-			
+			processControllers(environment, imports, presentation_controller_bindings, presentation_protocols);
+						
 			/*final Map<TypeElement, Class<?>> presentation_protocols = newHashMap();
 			final Map<TypeElement, Class<? extends Activity>> presentation_implementations = processPresentations(
 					environment, presentation_protocols);
@@ -134,8 +142,7 @@ public final class Prestige {
 			} catch (TemplateException exception) {
 				processingEnv.getMessager().printMessage(ERROR, exception.getMessage());
 			} finally {
-				if (writer != null)
-					try { writer.close(); } catch (Exception __) { }
+				Closeables.closeQuietly(writer);
 			}
 		     
 			// Releases the annotation processing utilities
@@ -146,37 +153,29 @@ public final class Prestige {
 		}
 
 		/**
-		 * <p>Processes the source code for the @Presentation annotation.</p>
+		 * <p>Processes the source code for the @Presentation and @PresentationImplementation annotations.</p>
 		 * @param environment The round environment
-		 * @param imports Will hold the list to place Presentation implementation classes
+		 * @param imports Will hold the list of Presentation implementations
 		 */
-		private void processControllers(RoundEnvironment environment, List<TypeElement> imports,
-				                        List<PresentationControllerBinding> presentation_controller_bindings) {
-			// TODO Auto-generated method stub			
-		}
-
-		/**
-		 * @param environment
-		 * @param imports
-		 */
-		private void processPresentations(RoundEnvironment environment, List<TypeElement> imports) {
+		private ImmutableMap<Element, Element> processPresentations(RoundEnvironment environment,
+				                                                        List<TypeElement> imports) {
 			final TypeMirror activity_type = _element_utilities.getTypeElement(Activity.class.getCanonicalName()).asType();
-			final TypeMirror no_protocol = _element_utilities.getTypeElement(NoProtocol.class.getCanonicalName()).asType();
-			
+			final Map<Element, Element> presentation_protocols = newHashMap();
+						
 			for (Element element : environment.getElementsAnnotatedWith(Presentation.class)) {
 				System.out.println("@Presentation is " + element);
 				
 				// Verifies that the target type is an interface
 				if (element.getKind() != INTERFACE) {
-					error(element, "@Presentation annotations may only be specified on interfaces (%s).",
+					error(element, "@Presentation annotation may only be specified on interfaces (%s).",
 						  element);
 					// Skips the current element
 					continue;
 				}
 				
-				// Verifies that the interface's visibility isn't private
-				if (element.getModifiers().contains(PRIVATE)) {
-					error(element, "@Presentation interfaces must not be private (%s).",
+				// Verifies that the interface's visibility is public
+				if (!element.getModifiers().contains(PUBLIC)) {
+					error(element, "@Presentation interface must be public (%s).",
 						  element);
 					// Skips the current element
 					continue;
@@ -201,13 +200,16 @@ public final class Prestige {
 					continue;
 				}
 				
-				// Verifies that the Protocol visibility isn't private
-				if (protocol.getModifiers().contains(PRIVATE)) {
-					error(element, "@Presentation Protocol must not be private (%s).",
+				// Verifies that the Protocol visibility is public
+				if (!protocol.getModifiers().contains(PUBLIC)) {
+					error(element, "@Presentation Protocol must be public (%s).",
 							protocol);
 					// Skips the current element
 					continue;
 				}
+				
+				// Adds the mapping of the Presentation to its Protocol (null if no Protocol is defined)
+				presentation_protocols.put(element, protocol);
 
 				// Now that the @Presentation annotation has been verified and its data extracted find the its implementations				
 				// TODO: very inefficient
@@ -220,7 +222,7 @@ public final class Prestige {
 					
 					// Verifies that the Presentation implementation extends from Activity
 			        if (!_type_utilities.isSubtype(implementation_element.asType(), activity_type)) {
-			          error(element, "Presentation implementing classes must extend from Activity (%s).",
+			          error(element, "@PresentationImplementation classes must extend from Activity (%s).",
 			                element); 
 			          // Skips the current element
 			          continue;
@@ -230,22 +232,95 @@ public final class Prestige {
 					imports.add((TypeElement) implementation_element);
 				}
 			}
+			
+			System.out.println("Finished processing Presentations.");
+			return ImmutableMap.copyOf(presentation_protocols);
 		}
 		
 		/**
-		 * <p>Retrieves a {@link Class} from the given {@link Element}.</p>
-		 * @param element The given element
-		 * @return The retrieved Class
+		 * <p>Processes the source code for the @Controller and @ControllerImplementation annotations.</p>
+		 * @param environment The round environment
+		 * @param imports Will hold the list of Controllers
+		 * @param presentation_controller_bindings Will hold the bindings between Presentation implementations and their 
+		 *        Controllers 
+		 * @param presentation_protocols The map of Presentations -> Protocols
 		 */
-		private Class<?> classFromElement(Element element) {
-			System.out.println("Get Class for " + element);
-			try {
-				return Class.forName(_element_utilities.getBinaryName((TypeElement) element).toString());
-			} catch (ClassNotFoundException exception) {
-				throw new ClassFromElementException(exception);
+		private void processControllers(RoundEnvironment environment, List<TypeElement> imports,
+				                        List<PresentationControllerBinding> presentation_controller_bindings,
+				                        ImmutableMap<Element, Element> presentation_protocols) {
+			final TypeMirror controller_contract = 
+					_element_utilities.getTypeElement(ControllerContract.class.getCanonicalName()).asType();
+			final TypeMirror default_presentation = _element_utilities.getTypeElement(Default.class.getCanonicalName()).asType();
+			final TypeMirror no_protocol = _element_utilities.getTypeElement(NoProtocol.class.getCanonicalName()).asType();
+			
+			for (Element element : environment.getElementsAnnotatedWith(Controller.class)) {
+				System.out.println("@Controller is " + element);
+				
+				// Verifies that the target type is an interface
+				if (element.getKind() != INTERFACE) {
+					error(element, "@Controller annotation may only be specified on interfaces (%s).",
+						  element);
+					// Skips the current element
+					continue;
+				} 
+				
+				// Verifies that the interface's visibility is public
+				if (!element.getModifiers().contains(PUBLIC)) {
+					error(element, "@Controller interface must be public (%s).",
+						  element);
+					// Skips the current element
+					continue;
+				}
+				
+				// Verifies that the interface extends the ControllerContract interface
+				if (!_type_utilities.isSubtype(element.asType(), controller_contract)) {
+					error(element, "@Controller interface must extend the ControllerContract (%s).",
+			              element); 
+			          // Skips the current element
+			          continue;
+				}
+				
+				// Gathers @Controller information
+				final Controller controller_annotation = element.getAnnotation(Controller.class);
+				Element presentation = null;
+				try {
+					controller_annotation.presentation();
+				} catch (MirroredTypeException exception) {
+					presentation = _type_utilities.asElement(exception.getTypeMirror());
+				}
+				
+				// Searches for a matching @Presentation if the Presentation is defined by naming convention
+				if (_type_utilities.isSameType(presentation.asType(), default_presentation)) {
+					final String presentation_from_controller_name = 
+							_CONTROLLER_TO_PRESENTATION.reset(element.getSimpleName()+ "").replaceAll("$1Presentation");
+					for (Element presentation_interface : presentation_protocols.keySet()) 
+						if (presentation_interface.getSimpleName().contentEquals(presentation_from_controller_name)) {
+							presentation = presentation_interface;
+							break;
+						}
+				}
+				
+				System.out.println("\tfor Presentation: " + presentation);
+				
+				// Verifies that the Controller's Presentation is a Presentation
+				if (!presentation_protocols.containsKey(presentation)) {
+					error(element, "@Controller Presentation must be an @Presentation (%s).", element);
+					// Skips the current element
+					continue;
+				}
+				
+				// Verifies that the Controller implements the Presentation's Protocol, if one is required
+				final Element protocol = presentation_protocols.get(presentation);
+				if (!(_type_utilities.isSubtype(element.asType(), no_protocol) || 
+					  _type_utilities.isSubtype(element.asType(), protocol.asType()))) {
+					error(element, "@Controller is required to implement Protocol %s by its Presentation (%s).",
+						  protocol, element);
+					// Skips the current element
+					continue;
+				}
 			}
 		}
-
+		
 		/**
 		 * <p>Processes the Controllers.</p>
 		 * @param environment
@@ -260,35 +335,8 @@ public final class Prestige {
 				Map<TypeElement, Class<? extends Activity>> presentation_implementations,
 				Map<TypeElement, Map<String, Class>> presentation_controller_implementations,
 				Map<Class<?>, String> controller_package_modules) {
-//			final TypeMirror controller_contract_type = _element_utilities.getTypeElement(
-//					ControllerContract.class.getCanonicalName()).asType();
-			final TypeMirror default_presentation = _element_utilities.getTypeElement(Default.class.getCanonicalName()).asType();
 			
-			for (Element element : environment.getElementsAnnotatedWith(Controller.class)) {
-				// Verifies that the target type is an interface
-				/*if (element.getKind() != INTERFACE) {
-					error(element, "@Controller annotations may only be specified on interfaces (%s).",
-						  element);
-					// Skips the current element
-					continue;
-				} */
-				
-				// Verifies that the interface's visibility isn't private
-				/*if (element.getModifiers().contains(PRIVATE)) {
-					error(element, "@Presentation interfaces may not be private (%s).",
-						  element);
-					// Skips the current element
-					continue;
-				}*/
-				
-				// Verifies that the interface extends the ControllerContract interface
-				/*if (!type_utilities.isSubtype(element.asType(), controller_contract_type)) {
-					error(element, "Controller interface must extend the ControllerContract (%s).",
-			              element); 
-			          // Skips the current element
-			          continue;
-				}*/
-				
+			for (Element element : environment.getElementsAnnotatedWith(Controller.class)) {				
 				// Assembles information on the Controller
 				final Map<TypeElement, Class> presentation_controllers = newHashMap();
 				final Controller controller_annotation = element.getAnnotation(Controller.class);
@@ -298,27 +346,6 @@ public final class Prestige {
 				} catch (MirroredTypeException exception) {
 					presentation = exception.getTypeMirror(); 
 				}
-				
-				if (_type_utilities.isSameType(presentation, default_presentation)) {
-					// FIXME: implementation of code my naming convention is potentially insufficiently robust
-					for (TypeElement presentation_interface : presentation_protocols.keySet()) {
-						if (presentation_interface.getSimpleName().contentEquals(
-								element.getSimpleName().toString().replaceAll("Controller", "Presentation"))) {
-							presentation = presentation_interface.asType();
-							break;
-						}
-					}
-				}
-				
-				// Verifies a Presentation was found for the Controller
-				/*if (presentation == Default.class || presentation_protocols.containsKey(element_utilities.getTypeElement(
-						presentation.getCanonicalName()))) {
-					error(element, "Expected to find a @Presentation-annotated interface named %s for @Controller (%s).",
-							  element.getSimpleName().toString().replaceAll("Controller", "") + "Presentation",
-							  element);
-					// Skips the current element
-					continue;
-				}*/
 					
 				// Verifies that the Controller implements the Presentation's Protocol, if one is required
 				final Class<?> protocol = presentation_protocols.get((TypeElement) _type_utilities.asElement(presentation));
@@ -380,61 +407,6 @@ public final class Prestige {
 				presentation_controller_implementations.put((TypeElement) element, controller_implementations);
 			}
 		}
-
-		/**
-		 * <p>Processes the Presentations.</p>
-		 * @param environment
-		 * @param activity_type
-		 * @param presentation_protocols
-		 * @return
-		 */
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		private Map<TypeElement, Class<? extends Activity>> processPresentations(
-				RoundEnvironment environment, Map<TypeElement, Class<?>> presentation_protocols) {
-			
-			for (Element element : environment.getElementsAnnotatedWith(PresentationImplementation.class)) {
-		        
-		        // Adds Presentation to list
-		        /*try {
-					presentation_protocols.put((TypeElement) element, 
-							_type_utilities.isSameType(protocol, no_protocol)
-								? null 
-								: Class.forName(((TypeElement) _type_utilities.asElement(protocol)).getQualifiedName().toString()));
-				} catch (ClassNotFoundException exception) {
-					error(protocol_element, exception.getMessage());
-					continue;
-				} */
-			}
-			
-			final Map<TypeElement, Class<? extends Activity>> presentation_implementations = newHashMap();
-			final Map<String, List<TypeElement>> package_modules = newHashMap();
-			// Processes the Presentation implementations
-			for (TypeElement presentation : presentation_protocols.keySet()) {
-				for (Class<?> presentation_implementation : _reflections.getSubTypesOf(presentation.asType().getClass())) {
-					final TypeElement element = _element_utilities.getTypeElement(
-							presentation_implementation.getCanonicalName());
-					
-					
-			        
-			        // Verifies the Presentation isn't already implemented
-			        /*if (presentation_implementations.containsKey(presentation)) {
-			        	error(element, "Presentation implemented multiple times (%s, %s).",
-			        		  presentation_implementation, presentation_implementations.get(presentation));
-			        	// Skips the current element
-			        	continue;
-			        }*/
-			        
-			        // Adds the Presentation implementation
-			        presentation_implementations.put(presentation, (Class<? extends Activity>) presentation_implementation);
-			        final String container = _element_utilities.getPackageOf(element).getQualifiedName().toString();
-			        if (package_modules.containsKey(container))
-		        		package_modules.get(container).add(element);
-		        	else
-		        		package_modules.put(container, newArrayList(element));     		
-				}
-			}
-			return presentation_implementations;
-		}
 		
 		/**
 		 * <p>Produces an error message with the given information.</p>
@@ -477,9 +449,9 @@ public final class Prestige {
 			 * @param presentation_implementation The implementation of the @Controller's @Presentation 
 			 */
 			public PresentationControllerBinding(TypeElement controller, TypeElement presentation_implementation) {
-				put(_CLASS_NAME, controller.getSimpleName().toString());
-				// TODO: use correct naming convention
-				put(_VARIABLE_NAME, controller.getSimpleName().toString());
+				final String class_name = controller.getSimpleName().toString();
+				put(_CLASS_NAME, class_name);
+				put(_VARIABLE_NAME, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, class_name));
 				put(_PRESENTATION_IMPLEMENTATION, presentation_implementation.getSimpleName().toString());
 			}
 			
@@ -504,6 +476,8 @@ public final class Prestige {
 			}
 		}
 		
+		/** Extracts the root from a Controller following the naming convention "*Controller" */
+		private static final Matcher _CONTROLLER_TO_PRESENTATION = Pattern.compile("(.+)Controller").matcher("");
 		/** Location on the class path where the templates are found */
 		private static final String _TEMPLATE_DIRECTORY = "/templates/";
 		/** Name of the ModelViewControllerModule source code template */

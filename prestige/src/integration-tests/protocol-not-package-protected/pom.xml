@@ -7,7 +7,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.imminentmeals.prestige.tests</groupId>
-  <artifactId>controller-presentation-must-exist</artifactId>
+  <artifactId>protocol-not-package-protected</artifactId>
   <version>HEAD-SNAPSHOT</version>
 
   <properties>

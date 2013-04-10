@@ -8,5 +8,5 @@ public class Test {
 	public interface PresentationInterface { }
 	
 	@PresentationImplementation
-	public static final class TestClass implements Inner { };
+	public static final class TestClass implements PresentationInterface { };
 }
