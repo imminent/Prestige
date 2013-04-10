@@ -6,12 +6,12 @@ import com.imminentmeals.prestige.annotations.Presentation;
 
 public class Test {
 	@Controller(presentation = PresentationInterface.class)
-	public interface Inner extends ControllerContract {
+	public interface ControllerInterface extends ControllerContract {
 		public void attachPresentation(Object presentation);
 	}
 	
 	@Presentation(protocol = Protocol.class)
 	public interface PresentationInterface { }
 	
-	public interface Protocol { }	
+	public interface Protocol { }
 }

@@ -5,7 +5,7 @@ import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Presentation;
 
 public class Test {
-	public static final class Inner implements ControllerInterface {
+	public static final class TestController implements ControllerInterface {
 		public void attachPresentation(Object presentation) { }
 	}
 	
@@ -13,5 +13,5 @@ public class Test {
 	public interface ControllerInterface extends ControllerContract { }
 	
 	@Presentation
-	public interface PresentationInterface { }	
+	public interface PresentationInterface { }
 }

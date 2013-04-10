@@ -1,10 +1,12 @@
 package test;
 
 import com.imminentmeals.prestige.annotations.Presentation;
+import com.imminentmeals.prestige.annotations.PresentationImplementation;
 
 public class Test {
 	@Presentation
-	public interface Inner { }
+	public interface PresentationInterface { }
 	
-	public static final class Implementation implements Inner { };
+	@PresentationImplementation
+	public static final class TestClass implements Inner { };
 }

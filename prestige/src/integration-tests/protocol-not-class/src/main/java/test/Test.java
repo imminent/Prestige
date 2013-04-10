@@ -4,7 +4,7 @@ import com.imminentmeals.prestige.annotations.Presentation;
 
 public class Test {
 	@Presentation(protocol = Protocol.class)
-	public interface Inner { }
+	public interface PresentationInterface { }
 	
 	public static final class Protocol { }
 }

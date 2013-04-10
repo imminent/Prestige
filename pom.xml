@@ -23,6 +23,7 @@
 
 	<modules>
 		<module>prestige</module>
+		<module>prestige-example</module>
 	</modules>
 
 	<properties>
