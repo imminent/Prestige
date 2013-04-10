@@ -7,7 +7,7 @@ import com.imminentmeals.prestige.annotations.Presentation;
 public class Test {
 	@Controller(presentation = PresentationInterface.class)
 	public interface Inner extends ControllerContract {
-		public void attachPresentation(Object presentation) { }
+		public void attachPresentation(Object presentation);
 	}
 	
 	@Presentation(protocol = Protocol.class)
