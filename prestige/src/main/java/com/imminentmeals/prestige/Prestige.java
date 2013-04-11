@@ -25,6 +25,7 @@ import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 
 import org.reflections.Reflections;
@@ -89,6 +90,9 @@ public final class Prestige {
 			
 			// Process the @Controller annotations and @ControllerImplementation annotations per @Controller annotation
 			processControllers(environment, imports, presentation_controller_bindings, presentation_protocols);
+			
+			System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
+			System.out.println("Presentation Controller bindings are " + Joiner.on(", ").join(presentation_controller_bindings));
 						
 			/*final Map<TypeElement, Class<?>> presentation_protocols = newHashMap();
 			final Map<TypeElement, Class<? extends Activity>> presentation_implementations = processPresentations(
@@ -318,6 +322,14 @@ public final class Prestige {
 					// Skips the current element
 					continue;
 				}
+				
+				// Adds Presentation Controller binding if Controller has a Presentation
+				if (!_type_utilities.isSameType(presentation.asType(), default_presentation)) {
+					imports.add((TypeElement) element);
+					presentation_controller_bindings.add(new PresentationControllerBinding(element, presentation));
+				} else
+					processingEnv.getMessager().printMessage(Kind.NOTE, String.format("No @Presentation for @Controller (%s).",
+							element));
 			}
 		}
 		
@@ -336,29 +348,7 @@ public final class Prestige {
 				Map<TypeElement, Map<String, Class>> presentation_controller_implementations,
 				Map<Class<?>, String> controller_package_modules) {
 			
-			for (Element element : environment.getElementsAnnotatedWith(Controller.class)) {				
-				// Assembles information on the Controller
-				final Map<TypeElement, Class> presentation_controllers = newHashMap();
-				final Controller controller_annotation = element.getAnnotation(Controller.class);
-				TypeMirror presentation = null;
-				try {
-					controller_annotation.presentation();
-				} catch (MirroredTypeException exception) {
-					presentation = exception.getTypeMirror(); 
-				}
-					
-				// Verifies that the Controller implements the Presentation's Protocol, if one is required
-				final Class<?> protocol = presentation_protocols.get((TypeElement) _type_utilities.asElement(presentation));
-				/*if (!(protocol == null || type_utilities.isSubtype(element.asType(), 
-						element_utilities.getTypeElement(protocol.getCanonicalName()).asType()))) {
-					error(element, "@Controller is required to implement Protocol %s by its Presentation (%s).",
-						  protocol.getCanonicalName(), element);
-					// Skips the current element
-					continue;
-				}*/
-				
-				// Adds Controller to list
-				presentation_controllers.put((TypeElement) element, (Class) presentation_implementations.get(presentation));
+			for (Element element : environment.getElementsAnnotatedWith(Controller.class)) {
 				
 				// Processes Controller implementations
 				final Map<String, Class> controller_implementations = newHashMap();
@@ -445,14 +435,14 @@ public final class Prestige {
 			
 			/**
 			 * <p>Constructs a {@link PresentationControllerBinding}.</p>
-			 * @param controller The @Controller
-			 * @param presentation_implementation The implementation of the @Controller's @Presentation 
+			 * @param element The @Controller
+			 * @param presentation The implementation of the @Controller's @Presentation 
 			 */
-			public PresentationControllerBinding(TypeElement controller, TypeElement presentation_implementation) {
-				final String class_name = controller.getSimpleName().toString();
+			public PresentationControllerBinding(Element element, Element presentation) {
+				final String class_name = element.getSimpleName().toString();
 				put(_CLASS_NAME, class_name);
 				put(_VARIABLE_NAME, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, class_name));
-				put(_PRESENTATION_IMPLEMENTATION, presentation_implementation.getSimpleName().toString());
+				put(_PRESENTATION_IMPLEMENTATION, presentation.getSimpleName().toString());
 			}
 			
 			private static final String _CLASS_NAME = "className";
