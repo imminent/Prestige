@@ -24,6 +24,11 @@
 			<scope>provided</scope>
 		</dependency>
 
+		<!-- Guava: Java utilites -->
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+		</dependency>
 		<!-- Dagger: Compile-time Java dependency injection -->
 		<dependency>
 			<groupId>com.squareup</groupId>
@@ -38,11 +43,6 @@
 		<dependency>
 			<groupId>com.squareup</groupId>
 			<artifactId>otto</artifactId>
-		</dependency>
-		<!-- Reflections: reflection library -->
-		<dependency>
-			<groupId>org.reflections</groupId>
-			<artifactId>reflections</artifactId>
 		</dependency>
 		<!-- FreeMaker: Template Generator -->
 		<dependency>
@@ -73,6 +73,11 @@
 			<artifactId>robolectric</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- FindBugs: Static analysis tools annotations -->
+		<dependency>
+			<groupId>com.google.code.findbugs</groupId>
+			<artifactId>jsr305</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -85,6 +90,16 @@
 				</configuration>
 			</plugin>
 
+			<!-- Quality analysis tools -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>findbugs-maven-plugin</artifactId>
+			</plugin>
+			
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-invoker-plugin</artifactId>
@@ -108,19 +123,6 @@
 							<goal>install</goal>
 							<goal>run</goal>
 						</goals>
-					</execution>
-				</executions>
-			</plugin>
-
-			<plugin>
-				<groupId>org.reflections</groupId>
-				<artifactId>reflections-maven</artifactId>
-				<executions>
-					<execution>
-						<goals>
-							<goal>reflections</goal>
-						</goals>
-						<phase>process-classes</phase>
 					</execution>
 				</executions>
 			</plugin>

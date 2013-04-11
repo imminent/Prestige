@@ -57,7 +57,7 @@ public class SegueController implements ActivityLifecycleCallbacks {
 			<#if controllers?has_content>
 			// Presentation -> injected Controller 
 			<#list controllers as controller>
-			.put(${controller.presentationImplementation}, ${controller.variableName})
+			.put(${controller.presentationImplementation}.class, ${controller.variableName})
 			</#list>
 			</#if>
 			.build();

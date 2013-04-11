@@ -31,13 +31,15 @@
 		<java.version>1.6</java.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<android.version>4.1.1.4</android.version>
+		<android.version_code>16</android.version_code>
 
 		<!-- Enhancements -->
 		<otto.version>1.3.3</otto.version>
 		<dagger.version>0.9.1</dagger.version>
 		<butterknife.version>1.3.0</butterknife.version>
-		<reflections.version>0.9.9-RC1</reflections.version>
 		<free-maker.version>2.3.19</free-maker.version>
+		<guava.version>14.0.1</guava.version>
+		<findbugs.version>2.0.1</findbugs.version>
 
 		<!-- Testing -->
 		<junit.version>4.10</junit.version>
@@ -50,6 +52,7 @@
 		<maven-release-plugin.version>2.4</maven-release-plugin.version>
 		<android-maven-plugin.version>3.5.1</android-maven-plugin.version>
 		<maven-checkstyle-plugin.version>2.9.1</maven-checkstyle-plugin.version>
+		<findbugs-maven-plugin.version>2.5.2</findbugs-maven-plugin.version>
 		<maven-pmd-plugin.version>2.7.1</maven-pmd-plugin.version>
 		<lint-maven-plugin.version>0.0.6</lint-maven-plugin.version>
 		<maven-invoker-plugin.version>1.7</maven-invoker-plugin.version>
@@ -63,6 +66,18 @@
 				<groupId>com.google.android</groupId>
 				<artifactId>android</artifactId>
 				<version>${android.version}</version>
+			</dependency>
+			<!-- Guava: Java utilites -->
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>${guava.version}</version>
+			</dependency>
+			<!-- Butter Knife: View "injection" -->
+			<dependency>
+				<groupId>com.jakewharton</groupId>
+				<artifactId>butterknife</artifactId>
+				<version>${butterknife.version}</version>
 			</dependency>
 			<!-- Dagger: Compile-time Java dependency injection -->
 			<dependency>
@@ -81,12 +96,6 @@
 				<groupId>com.squareup</groupId>
 				<artifactId>otto</artifactId>
 				<version>${otto.version}</version>
-			</dependency>
-			<!-- Reflections: reflection library -->
-			<dependency>
-				<groupId>org.reflections</groupId>
-				<artifactId>reflections</artifactId>
-				<version>${reflections.version}</version>
 			</dependency>
 			<!-- FreeMaker: Template Generator -->
 			<dependency>
@@ -117,6 +126,12 @@
 				<groupId>org.robolectric</groupId>
 				<artifactId>robolectric</artifactId>
 				<version>${robolectric.version}</version>
+			</dependency>
+			<!-- FindBugs: Static analysis tools annotations -->
+			<dependency>
+				<groupId>com.google.code.findbugs</groupId>
+				<artifactId>jsr305</artifactId>
+				<version>${findbugs.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
@@ -154,6 +169,26 @@
 			</plugin>
 
 			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>findbugs-maven-plugin</artifactId>
+				<version>${findbugs-maven-plugin.version}</version>
+				<configuration>
+					<excludeFilterFile>findbugs-filter.xml</excludeFilterFile>
+					<includeFilterFile>findbugs-include.xml</includeFilterFile>
+					<failOnError>false</failOnError>
+				</configuration>
+				<executions>
+					<execution>
+						<id>findbugs-check</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-release-plugin</artifactId>
 				<version>${maven-release-plugin.version}</version>
@@ -171,7 +206,7 @@
 					<version>${android-maven-plugin.version}</version>
 					<configuration>
 						<sdk>
-							<platform>${android.platform}</platform>
+							<platform>${android.version_code}</platform>
 						</sdk>
 					</configuration>
 				</plugin>
@@ -183,9 +218,17 @@
 				</plugin>
 
 				<plugin>
-					<groupId>org.reflections</groupId>
-					<artifactId>reflections-maven</artifactId>
-					<version>${reflections.version}</version>
+					<groupId>com.lewisd</groupId>
+					<artifactId>lint-maven-plugin</artifactId>
+					<version>${lint-maven-plugin.version}</version>
+					<executions>
+						<execution>
+							<phase>validate</phase>
+							<goals>
+								<goal>check</goal>
+							</goals>
+						</execution>
+					</executions>
 				</plugin>
 
 				<!-- Eclipse config -->
@@ -212,11 +255,11 @@
 								</pluginExecution>
 								<pluginExecution>
 									<pluginExecutionFilter>
-										<groupId>org.reflections</groupId>
-										<artifactId>reflections-maven</artifactId>
-										<versionRange>[0.9.9-RC1,)</versionRange>
+										<groupId>com.lewisd</groupId>
+										<artifactId>lint-maven-plugin</artifactId>
+										<versionRange>[${lint-maven-plugin.version},)</versionRange>
 										<goals>
-											<goal>reflections</goal>
+											<goal>check</goal>
 										</goals>
 									</pluginExecutionFilter>
 									<action>

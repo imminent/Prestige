@@ -2,6 +2,7 @@ package com.imminentmeals.prestige;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Maps.transformEntries;
 import static javax.lang.model.element.ElementKind.INTERFACE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
@@ -14,6 +15,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nullable;
+import javax.annotation.Syntax;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.RoundEnvironment;
@@ -25,16 +28,14 @@ import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
-
-import org.reflections.Reflections;
 
 import android.app.Activity;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps.EntryTransformer;
 import com.google.common.io.Closeables;
 import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Controller.Default;
@@ -53,6 +54,7 @@ import freemarker.template.TemplateException;
 public final class Prestige {
 
 	@SupportedAnnotationTypes({ "com.imminentmeals.prestige.annotations.Presentation",
+		                        "com.imminentmeals.prestige.annotations.PresentationImplementation",
                                 "com.imminentmeals.prestige.annotations.Controller",
                                 "com.imminentmeals.prestige.annotations.ControllerImplementation" })
 	public static class AnnotationProcessor extends AbstractProcessor {
@@ -78,18 +80,21 @@ public final class Prestige {
 			_element_utilities = processingEnv.getElementUtils();
 			_type_utilities = processingEnv.getTypeUtils();
 			
+			// Configures the templates generating the code        
+	        final Configuration template_configuration = createTemplateConfiguration();
+			
 			// Initializes the data model subcomponents that will be used when generating the code
 			final List<TypeElement> imports = newArrayList();
 			final List<PresentationControllerBinding> presentation_controller_bindings = newArrayList();
 			
 			// Process the @Presentation annotations
-			final ImmutableMap<Element, Element> presentation_protocols = processPresentations(environment, imports);
+			final ImmutableMap<Element, PresentationData> presentations = processPresentations(environment, imports);
 			
 			System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
-			System.out.println("Presentations -> Protocols is " + Joiner.on(", ").join(presentation_protocols.entrySet()));
+			System.out.println("Presentations data is " + Joiner.on(", ").join(presentations.entrySet()));
 			
 			// Process the @Controller annotations and @ControllerImplementation annotations per @Controller annotation
-			processControllers(environment, imports, presentation_controller_bindings, presentation_protocols);
+			processControllers(environment, imports, presentation_controller_bindings, presentations);
 			
 			System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
 			System.out.println("Presentation Controller bindings are " + Joiner.on(", ").join(presentation_controller_bindings));
@@ -118,13 +123,9 @@ public final class Prestige {
 
 				@Override
 				public PresentationControllerBinding apply(@Nullable TypeElement controller) {
-					// FIXME: finish implementation
 					return new PresentationControllerBinding(controller, controller);
 				}
 			});*/
-			
-			// Configures the templates generating the code        
-	        final Configuration template_configuration = createTemplateConfiguration();
 	        
 			// Generates the code
 			final Filer filer = processingEnv.getFiler();
@@ -146,7 +147,9 @@ public final class Prestige {
 			} catch (TemplateException exception) {
 				processingEnv.getMessager().printMessage(ERROR, exception.getMessage());
 			} finally {
-				Closeables.closeQuietly(writer);
+				try {
+					Closeables.close(writer, writer != null);
+				} catch (IOException exception) { }
 			}
 		     
 			// Releases the annotation processing utilities
@@ -161,10 +164,11 @@ public final class Prestige {
 		 * @param environment The round environment
 		 * @param imports Will hold the list of Presentation implementations
 		 */
-		private ImmutableMap<Element, Element> processPresentations(RoundEnvironment environment,
+		private ImmutableMap<Element, PresentationData> processPresentations(RoundEnvironment environment,
 				                                                        List<TypeElement> imports) {
 			final TypeMirror activity_type = _element_utilities.getTypeElement(Activity.class.getCanonicalName()).asType();
 			final Map<Element, Element> presentation_protocols = newHashMap();
+			final Map<Element, Element> presentation_implementations = newHashMap();
 						
 			for (Element element : environment.getElementsAnnotatedWith(Presentation.class)) {
 				System.out.println("@Presentation is " + element);
@@ -234,11 +238,20 @@ public final class Prestige {
 			        
 			        // Adds the implementation to the list of imports
 					imports.add((TypeElement) implementation_element);
+					presentation_implementations.put(element, implementation_element);
 				}
 			}
 			
 			System.out.println("Finished processing Presentations.");
-			return ImmutableMap.copyOf(presentation_protocols);
+			return ImmutableMap.copyOf(transformEntries(presentation_implementations, 
+					new EntryTransformer<Element, Element, PresentationData>() {
+
+						@Override
+						public PresentationData transformEntry(@Nullable Element key, @Nullable Element implementation) {
+							return new PresentationData(presentation_protocols.get(key), implementation);
+						}
+				
+			}));
 		}
 		
 		/**
@@ -247,11 +260,11 @@ public final class Prestige {
 		 * @param imports Will hold the list of Controllers
 		 * @param presentation_controller_bindings Will hold the bindings between Presentation implementations and their 
 		 *        Controllers 
-		 * @param presentation_protocols The map of Presentations -> Protocols
+		 * @param presentations The map of Presentations -> {@link PresentationData}
 		 */
 		private void processControllers(RoundEnvironment environment, List<TypeElement> imports,
 				                        List<PresentationControllerBinding> presentation_controller_bindings,
-				                        ImmutableMap<Element, Element> presentation_protocols) {
+				                        ImmutableMap<Element, PresentationData> presentations) {
 			final TypeMirror controller_contract = 
 					_element_utilities.getTypeElement(ControllerContract.class.getCanonicalName()).asType();
 			final TypeMirror default_presentation = _element_utilities.getTypeElement(Default.class.getCanonicalName()).asType();
@@ -297,7 +310,7 @@ public final class Prestige {
 				if (_type_utilities.isSameType(presentation.asType(), default_presentation)) {
 					final String presentation_from_controller_name = 
 							_CONTROLLER_TO_PRESENTATION.reset(element.getSimpleName()+ "").replaceAll("$1Presentation");
-					for (Element presentation_interface : presentation_protocols.keySet()) 
+					for (Element presentation_interface : presentations.keySet()) 
 						if (presentation_interface.getSimpleName().contentEquals(presentation_from_controller_name)) {
 							presentation = presentation_interface;
 							break;
@@ -307,15 +320,15 @@ public final class Prestige {
 				System.out.println("\tfor Presentation: " + presentation);
 				
 				// Verifies that the Controller's Presentation is a Presentation
-				if (!presentation_protocols.containsKey(presentation)) {
+				if (!presentations.containsKey(presentation)) {
 					error(element, "@Controller Presentation must be an @Presentation (%s).", element);
 					// Skips the current element
 					continue;
 				}
 				
 				// Verifies that the Controller implements the Presentation's Protocol, if one is required
-				final Element protocol = presentation_protocols.get(presentation);
-				if (!(_type_utilities.isSubtype(element.asType(), no_protocol) || 
+				final Element protocol = presentations.get(presentation).protocol;
+				if (!(_type_utilities.isSubtype(protocol.asType(), no_protocol) || 
 					  _type_utilities.isSubtype(element.asType(), protocol.asType()))) {
 					error(element, "@Controller is required to implement Protocol %s by its Presentation (%s).",
 						  protocol, element);
@@ -326,11 +339,12 @@ public final class Prestige {
 				// Adds Presentation Controller binding if Controller has a Presentation
 				if (!_type_utilities.isSameType(presentation.asType(), default_presentation)) {
 					imports.add((TypeElement) element);
-					presentation_controller_bindings.add(new PresentationControllerBinding(element, presentation));
-				} else
-					processingEnv.getMessager().printMessage(Kind.NOTE, String.format("No @Presentation for @Controller (%s).",
-							element));
+					presentation_controller_bindings.add(new PresentationControllerBinding(element, 
+							presentations.get(presentation).implementation));
+				}
 			}
+			
+			System.out.println("Finished processing Controllers.");
 		}
 		
 		/**
@@ -342,7 +356,7 @@ public final class Prestige {
 		 * @param presentation_controller_implementations
 		 * @param controller_package_modules
 		 */
-		@SuppressWarnings("rawtypes")
+		@SuppressWarnings({ "rawtypes", "unchecked", "unused" })
 		private void processControllers(RoundEnvironment environment, Map<TypeElement, Class<?>> presentation_protocols,
 				Map<TypeElement, Class<? extends Activity>> presentation_implementations,
 				Map<TypeElement, Map<String, Class>> presentation_controller_implementations,
@@ -352,45 +366,37 @@ public final class Prestige {
 				
 				// Processes Controller implementations
 				final Map<String, Class> controller_implementations = newHashMap();
-				try {
-					for (Class<?> controller_implementation : _reflections.getSubTypesOf(Class.forName(
-							((TypeElement) element).getQualifiedName().toString()))) {
-						final TypeElement controller_element = _element_utilities.getTypeElement(
-								controller_implementation.getCanonicalName());
-						
-						// Verifies that the Controller implementation has a ControllerImplementation
-						/*final ControllerImplementation annotation = 
-								controller_implementation.getAnnotation(ControllerImplementation.class);
-				        if (annotation == null) {
-				          error(element, "Controller implementing classes must have @ControllerImplementation " +
-				          		" or one of its nickname annotations (%s).",
-				                controller_element); 
-				          // Skips the current element
-				          continue;
-				        }*/
-				        
-				        // Assembles information on the Controller implementation
-				        /*final String implementation_type = annotation.value();
-				        
-				        // Verifies the Controller implementation is defined only once
-				        if (controller_implementations.containsKey(implementation_type)) {
-				        	error(element, "%s-type Controller implemented multiple times (%s, %s).",
-				        		  implementation_type, controller_implementation, 
-				        		  controller_implementations.get(implementation_type));
-				        	// Skips the current element
-				        	continue;
-				        }*/
-				        
-				        // Adds the Controller implementation to list
-				        /*controller_implementations.put(implementation_type, controller_implementation);
-				        controller_package_modules.put(controller_implementation, 
-				        		_element_utilities.getPackageOf(controller_element).getQualifiedName().toString());*/
-					}
-				} catch (ClassNotFoundException exception) {
-					/*error(element, "Expected to find Class %s.",
-						  ((TypeElement) element).getQualifiedName());
-					// Skips the current element
-					continue;*/
+				for (Class<?> controller_implementation : newArrayList(Controller.class)) {
+					final TypeElement controller_element = _element_utilities.getTypeElement(
+							controller_implementation.getCanonicalName());
+					
+					// Verifies that the Controller implementation has a ControllerImplementation
+					/*final ControllerImplementation annotation = 
+							controller_implementation.getAnnotation(ControllerImplementation.class);
+				    if (annotation == null) {
+				      error(element, "Controller implementing classes must have @ControllerImplementation " +
+				      		" or one of its nickname annotations (%s).",
+				            controller_element); 
+				      // Skips the current element
+				      continue;
+				    }*/
+				    
+				    // Assembles information on the Controller implementation
+				    /*final String implementation_type = annotation.value();
+				    
+				    // Verifies the Controller implementation is defined only once
+				    if (controller_implementations.containsKey(implementation_type)) {
+				    	error(element, "%s-type Controller implemented multiple times (%s, %s).",
+				    		  implementation_type, controller_implementation, 
+				    		  controller_implementations.get(implementation_type));
+				    	// Skips the current element
+				    	continue;
+				    }*/
+				    
+				    // Adds the Controller implementation to list
+				    /*controller_implementations.put(implementation_type, controller_implementation);
+				    controller_package_modules.put(controller_implementation, 
+				    		_element_utilities.getPackageOf(controller_element).getQualifiedName().toString());*/
 				}
 				
 				// Adds the Controller implementations to the list of all Controller implementations
@@ -414,6 +420,7 @@ public final class Prestige {
 		 * @return The created configuration
 		 */
 		private Configuration createTemplateConfiguration() {
+			System.out.println("Configuring template loading...");
 			// WORKAROUND: log4j is not found, so this disables logging to prevent the error
 	        try {
 				freemarker.log.Logger.selectLoggerLibrary(freemarker.log.Logger.LIBRARY_NONE);
@@ -435,14 +442,14 @@ public final class Prestige {
 			
 			/**
 			 * <p>Constructs a {@link PresentationControllerBinding}.</p>
-			 * @param element The @Controller
-			 * @param presentation The implementation of the @Controller's @Presentation 
+			 * @param controller The @Controller
+			 * @param presentation_implementation The implementation of the @Controller's @Presentation 
 			 */
-			public PresentationControllerBinding(Element element, Element presentation) {
-				final String class_name = element.getSimpleName().toString();
+			public PresentationControllerBinding(Element controller, Element presentation_implementation) {
+				final String class_name = controller.getSimpleName().toString();
 				put(_CLASS_NAME, class_name);
 				put(_VARIABLE_NAME, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, class_name));
-				put(_PRESENTATION_IMPLEMENTATION, presentation.getSimpleName().toString());
+				put(_PRESENTATION_IMPLEMENTATION, presentation_implementation.getSimpleName().toString());
 			}
 			
 			private static final String _CLASS_NAME = "className";
@@ -451,19 +458,32 @@ public final class Prestige {
 		}
 		
 		/**
-		 * <p>Indicates an error occurred while getting a {@link Class} from an {@link Element}.</p>
+		 * <p>Container for Presentation data.</p>
 		 * @author Dandre Allison
 		 */
-		@SuppressWarnings("serial")
-		private static class ClassFromElementException extends RuntimeException { 
+		private static class PresentationData {
+			/** The Protocol */
+			public final Element protocol;
+			/** The Presentation implementation */
+			public final Element implementation;
 			
 			/**
-			 * <p>Constructs a {@link ClassFromElementException}.</p>
-			 * @param exception The thrown exception
+			 * <p>Constructs a {@link PresentationData}.</p>
+			 * @param protocol The Protocol
+			 * @param implementation The presentation implementation
 			 */
-			public ClassFromElementException(Exception exception) {
-				super(exception);
+			public PresentationData(Element protocol, Element implementation) {
+				this.protocol = protocol;
+				this.implementation = implementation;
 			}
+
+			@Override
+			public String toString() {
+				return String.format(format, protocol, implementation);
+			}
+			
+			@Syntax("RegEx")
+			private static final String format = "protocol:\n\t%s\nimplementation:\n\t%s";
 		}
 		
 		/** Extracts the root from a Controller following the naming convention "*Controller" */
@@ -482,7 +502,6 @@ public final class Prestige {
 		private int _passes = 0;
 		private Elements _element_utilities;
 		private Types _type_utilities;
-		private final Reflections _reflections = new Reflections("");
 	}
 	
 /* Private Constructor */
