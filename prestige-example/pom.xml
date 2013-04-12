@@ -85,6 +85,9 @@
 				<extensions>true</extensions>
 				<groupId>com.jayway.maven.plugins.android.generation2</groupId>
 				<artifactId>android-maven-plugin</artifactId>
+				<configuration>
+					<proc>none</proc>
+				</configuration>
 			</plugin>
 
 			<!-- Quality Analysis -->

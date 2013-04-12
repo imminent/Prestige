@@ -23,6 +23,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
@@ -34,11 +35,13 @@ import android.app.Activity;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps.EntryTransformer;
 import com.google.common.io.Closeables;
 import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Controller.Default;
+import com.imminentmeals.prestige.annotations.ControllerImplementation;
 import com.imminentmeals.prestige.annotations.Presentation;
 import com.imminentmeals.prestige.annotations.Presentation.NoProtocol;
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
@@ -86,46 +89,45 @@ public final class Prestige {
 			// Initializes the data model subcomponents that will be used when generating the code
 			final List<TypeElement> imports = newArrayList();
 			final List<PresentationControllerBinding> presentation_controller_bindings = newArrayList();
+			final Map<String, List<ControllerData>> controllers = newHashMap();
 			
 			// Process the @Presentation annotations
 			final ImmutableMap<Element, PresentationData> presentations = processPresentations(environment, imports);
 			
-			System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
-			System.out.println("Presentations data is " + Joiner.on(", ").join(presentations.entrySet()));
+			if (!imports.isEmpty())
+				System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
+			if (!presentations.isEmpty())
+				System.out.println("Presentations data is " + Joiner.on(", ").join(presentations.entrySet()));
 			
 			// Process the @Controller annotations and @ControllerImplementation annotations per @Controller annotation
-			processControllers(environment, imports, presentation_controller_bindings, presentations);
+			processControllers(environment, imports, presentation_controller_bindings, controllers, presentations);
 			
-			System.out.println("Presentation imports are " + Joiner.on(", ").join(imports));
-			System.out.println("Presentation Controller bindings are " + Joiner.on(", ").join(presentation_controller_bindings));
-						
-			/*final Map<TypeElement, Class<?>> presentation_protocols = newHashMap();
-			final Map<TypeElement, Class<? extends Activity>> presentation_implementations = processPresentations(
-					environment, presentation_protocols);
+			if (!imports.isEmpty())
+				System.out.println("All imports are " + Joiner.on(", ").join(imports));
+			if (!presentation_controller_bindings.isEmpty())
+				System.out.println("Presentation Controller bindings are " + Joiner.on(", ").join(presentation_controller_bindings));
 			
-			final Map<TypeElement, Map<String, Class>> presentation_controller_implementations = newHashMap();
-			final Map<Class<?>, String> controller_package_modules = newHashMap();
-			processControllers(environment,
-					presentation_protocols, presentation_implementations,
-					presentation_controller_implementations,
-					controller_package_modules);*/
-			
-			// Creates the data model used to generate the code
-			final Map<String, List<?>> data_model = ImmutableMap.of(
+			// Creates the data models used to generate the code
+			final Map<String, List<?>> segue_controller_data_model = ImmutableMap.of(
 					"imports", imports, 
                     "controllers", presentation_controller_bindings);
-			/*imports.addAll(Sets.union(presentation_implementations.keySet(), 
-			presentation_controller_implementations.keySet())); 
-    final Set<TypeElement> controller_injections = presentation_controller_implementations.keySet();
-    final Collection<PresentationControllerBinding> controllers = transform(
-    		presentation_controller_implementations.keySet(),
-    		new Function<TypeElement, PresentationControllerBinding>() {
-
-				@Override
-				public PresentationControllerBinding apply(@Nullable TypeElement controller) {
-					return new PresentationControllerBinding(controller, controller);
-				}
-			});*/
+			
+			final ImmutableList.Builder<String> controller_modules = ImmutableList.<String>builder();
+			final ImmutableList.Builder<Map<String, Object>> controller_module_data_model_builder = 
+					ImmutableList.<Map<String, Object>>builder();
+			for (Map.Entry<String, List<ControllerData>> controller_implementations : controllers.entrySet()) {
+				final Element implementation = controller_implementations.getValue().get(0).implementation;
+				final String package_name = _element_utilities.getPackageOf(implementation).getQualifiedName() + "";
+				final String class_name = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, 
+						controller_implementations.getKey() + "ControllerModule");
+				controller_module_data_model_builder.add(ImmutableMap.of(
+						"className", class_name, 
+						"qualifiedName", String.format("%s.%s", package_name, class_name),
+						"package", package_name,
+						"controllers", controller_implementations.getValue()));
+				controller_modules.add(class_name);
+			}
+			final List<Map<String, Object>> controller_module_data_models = controller_module_data_model_builder.build();
 	        
 			// Generates the code
 			final Filer filer = processingEnv.getFiler();
@@ -135,13 +137,23 @@ public final class Prestige {
 				JavaFileObject source_code = filer.createSourceFile(_SEGUE_CONTROLLER_SOURCE, (Element) null);
 		        writer = source_code.openWriter();
 		        writer.flush();
-		        template_configuration.getTemplate(_SEGUE_CONTROLLER_TEMPLATE).process(data_model, writer);
+		        template_configuration.getTemplate(_SEGUE_CONTROLLER_TEMPLATE).process(segue_controller_data_model, writer);
 		        writer.close();
+		        
+		        // Generates the *ControllerModules
+		        for (Map<String, Object> controller_module_data_model : controller_module_data_models) {
+		        	source_code = filer.createSourceFile((String) controller_module_data_model.get("qualifiedName"), 
+		        			                             (Element) null);
+		        	writer = source_code.openWriter();
+		        	writer.flush();
+		        	template_configuration.getTemplate(_CONTROLLER_MODULE_TEMPLATE).process(controller_module_data_model, writer);
+		        	writer.close();
+		        }
 		        
 		        // Generates the ModelViewControllerModule
 		        source_code = filer.createSourceFile(_MODEL_VIEW_CONTROLLER_MODULE_SOURCE, (Element) null);
 		        writer = source_code.openWriter();
-		        template_configuration.getTemplate(_MODEL_VIEW_CONTROLLER_MODULE_TEMPLATE).process(data_model, writer);
+		        template_configuration.getTemplate(_MODEL_VIEW_CONTROLLER_MODULE_TEMPLATE).process(segue_controller_data_model, writer);
 			} catch (IOException exception) {
 				processingEnv.getMessager().printMessage(ERROR, exception.getMessage());
 			} catch (TemplateException exception) {
@@ -219,7 +231,7 @@ public final class Prestige {
 				// Adds the mapping of the Presentation to its Protocol (null if no Protocol is defined)
 				presentation_protocols.put(element, protocol);
 
-				// Now that the @Presentation annotation has been verified and its data extracted find the its implementations				
+				// Now that the @Presentation annotation has been verified and its data extracted find its implementations				
 				// TODO: very inefficient
 				for (Element implementation_element : environment.getElementsAnnotatedWith(PresentationImplementation.class)) {
 					// Makes sure to only deal with Presentation implementations for the current @Presentation
@@ -243,12 +255,13 @@ public final class Prestige {
 			}
 			
 			System.out.println("Finished processing Presentations.");
-			return ImmutableMap.copyOf(transformEntries(presentation_implementations, 
+			// TODO: Should require there to exist a @PresentationImplementation for @Controller to work?? Good?
+			return ImmutableMap.copyOf(transformEntries(presentation_protocols, 
 					new EntryTransformer<Element, Element, PresentationData>() {
 
 						@Override
-						public PresentationData transformEntry(@Nullable Element key, @Nullable Element implementation) {
-							return new PresentationData(presentation_protocols.get(key), implementation);
+						public PresentationData transformEntry(@Nullable Element key, @Nullable Element protocol) {
+							return new PresentationData(protocol, presentation_implementations.get(key));
 						}
 				
 			}));
@@ -260,10 +273,12 @@ public final class Prestige {
 		 * @param imports Will hold the list of Controllers
 		 * @param presentation_controller_bindings Will hold the bindings between Presentation implementations and their 
 		 *        Controllers 
+		 * @param controllers Will hold the list of Controllers grouped under an implementation scope
 		 * @param presentations The map of Presentations -> {@link PresentationData}
 		 */
 		private void processControllers(RoundEnvironment environment, List<TypeElement> imports,
 				                        List<PresentationControllerBinding> presentation_controller_bindings,
+				                        Map<String, List<ControllerData>> controllers, 
 				                        ImmutableMap<Element, PresentationData> presentations) {
 			final TypeMirror controller_contract = 
 					_element_utilities.getTypeElement(ControllerContract.class.getCanonicalName()).asType();
@@ -339,69 +354,39 @@ public final class Prestige {
 				// Adds Presentation Controller binding if Controller has a Presentation
 				if (!_type_utilities.isSameType(presentation.asType(), default_presentation)) {
 					imports.add((TypeElement) element);
-					presentation_controller_bindings.add(new PresentationControllerBinding(element, 
-							presentations.get(presentation).implementation));
+					// TODO: Should require there to exist a @PresentationImplementation for @Controller to work?? Good?
+					if (presentations.get(presentation).implementation != null)
+						presentation_controller_bindings.add(new PresentationControllerBinding(element, 
+								presentations.get(presentation).implementation));
+				}
+				
+				// Now that the @Controller annotation has been verified and its data extracted find its implementations				
+				// TODO: very inefficient
+				for (Element implementation_element : environment.getElementsAnnotatedWith(ControllerImplementation.class)) {
+					// Makes sure to only deal with Controller implementations for the current @Controller
+					if (!_type_utilities.isSubtype(implementation_element.asType(), element.asType()))
+						continue;
+					
+					System.out.println("\twith an implementation of " + implementation_element);
+					
+					// Gathers @ControllerImplementation information
+					final String scope = implementation_element.getAnnotation(ControllerImplementation.class).value();
+					final PackageElement package_name = _element_utilities.getPackageOf(implementation_element);
+					final List<ControllerData> implementations = controllers.get(scope);
+					if (implementations == null)
+						controllers.put(scope, newArrayList(new ControllerData(element, implementation_element)));
+					// Verifies that the scope-grouped @ControllerImplementations are in the same package
+					else if (!_element_utilities.getPackageOf(implementations.get(0).implementation).equals(package_name)) {
+						error(element, "All @ControllerImplementation(\"%s\") must be defined in the same package (%s).",
+							  scope, implementation_element);
+						// Skips the current element
+						continue;
+					} else
+						implementations.add(new ControllerData(element, implementation_element));
 				}
 			}
 			
 			System.out.println("Finished processing Controllers.");
-		}
-		
-		/**
-		 * <p>Processes the Controllers.</p>
-		 * @param environment
-		 * @param controller_contract_type
-		 * @param presentation_protocols
-		 * @param presentation_implementations
-		 * @param presentation_controller_implementations
-		 * @param controller_package_modules
-		 */
-		@SuppressWarnings({ "rawtypes", "unchecked", "unused" })
-		private void processControllers(RoundEnvironment environment, Map<TypeElement, Class<?>> presentation_protocols,
-				Map<TypeElement, Class<? extends Activity>> presentation_implementations,
-				Map<TypeElement, Map<String, Class>> presentation_controller_implementations,
-				Map<Class<?>, String> controller_package_modules) {
-			
-			for (Element element : environment.getElementsAnnotatedWith(Controller.class)) {
-				
-				// Processes Controller implementations
-				final Map<String, Class> controller_implementations = newHashMap();
-				for (Class<?> controller_implementation : newArrayList(Controller.class)) {
-					final TypeElement controller_element = _element_utilities.getTypeElement(
-							controller_implementation.getCanonicalName());
-					
-					// Verifies that the Controller implementation has a ControllerImplementation
-					/*final ControllerImplementation annotation = 
-							controller_implementation.getAnnotation(ControllerImplementation.class);
-				    if (annotation == null) {
-				      error(element, "Controller implementing classes must have @ControllerImplementation " +
-				      		" or one of its nickname annotations (%s).",
-				            controller_element); 
-				      // Skips the current element
-				      continue;
-				    }*/
-				    
-				    // Assembles information on the Controller implementation
-				    /*final String implementation_type = annotation.value();
-				    
-				    // Verifies the Controller implementation is defined only once
-				    if (controller_implementations.containsKey(implementation_type)) {
-				    	error(element, "%s-type Controller implemented multiple times (%s, %s).",
-				    		  implementation_type, controller_implementation, 
-				    		  controller_implementations.get(implementation_type));
-				    	// Skips the current element
-				    	continue;
-				    }*/
-				    
-				    // Adds the Controller implementation to list
-				    /*controller_implementations.put(implementation_type, controller_implementation);
-				    controller_package_modules.put(controller_implementation, 
-				    		_element_utilities.getPackageOf(controller_element).getQualifiedName().toString());*/
-				}
-				
-				// Adds the Controller implementations to the list of all Controller implementations
-				presentation_controller_implementations.put((TypeElement) element, controller_implementations);
-			}
 		}
 		
 		/**
@@ -449,12 +434,36 @@ public final class Prestige {
 				final String class_name = controller.getSimpleName().toString();
 				put(_CLASS_NAME, class_name);
 				put(_VARIABLE_NAME, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, class_name));
-				put(_PRESENTATION_IMPLEMENTATION, presentation_implementation.getSimpleName().toString());
+				put(_PRESENTATION_IMPLEMENTATION, presentation_implementation.getSimpleName());
 			}
 			
 			private static final String _CLASS_NAME = "className";
 			private static final String _VARIABLE_NAME = "variableName";
 			private static final String _PRESENTATION_IMPLEMENTATION = "presentationImplementation";
+		}
+		
+		/**
+		 * <p>Container for @Controller data, groups the Controller interface with its implementation</p>.
+		 * @author Dandre Allison
+		 */
+		@SuppressWarnings("serial")
+		private static class ControllerData extends SimpleHash {
+			/** The @ControllerImplementation stored for use in setting up code generation */
+			public final Element implementation;
+			
+			/**
+			 * <p>Constructs a {@link ControllerData}.<p>
+			 * @param controller The @Controller 
+			 * @param controller_implementation The implentation of the @Controller
+			 */
+			public ControllerData(Element controller, Element controller_implementation) {
+				put(_INTERFACE, controller);
+				put(_IMPLEMENTATION, controller_implementation.getSimpleName());
+				implementation = controller_implementation;
+			}
+			
+			private static final String _INTERFACE = "interface";
+			private static final String _IMPLEMENTATION = "implementation";
 		}
 		
 		/**
@@ -483,7 +492,7 @@ public final class Prestige {
 			}
 			
 			@Syntax("RegEx")
-			private static final String format = "protocol:\n\t%s\nimplementation:\n\t%s";
+			private static final String format = "{protocol: %s, implementation: %s}";
 		}
 		
 		/** Extracts the root from a Controller following the naming convention "*Controller" */
@@ -492,8 +501,10 @@ public final class Prestige {
 		private static final String _TEMPLATE_DIRECTORY = "/templates/";
 		/** Name of the ModelViewControllerModule source code template */
 		private static final String _MODEL_VIEW_CONTROLLER_MODULE_TEMPLATE = "ModelViewControllerModuleTemplate.ftl";
-		/** Name of the SegueController source code template*/
+		/** Name of the SegueController source code template */
 		private static final String _SEGUE_CONTROLLER_TEMPLATE = "SegueControllerTemplate.ftl";
+		/** Name of the *ControllerModule source code template */
+		private static final String _CONTROLLER_MODULE_TEMPLATE = "ControllerModuleTemplate.ftl";
 		/** Qualified name for the ModelViewControllerModule source code */
 		private static final String _MODEL_VIEW_CONTROLLER_MODULE_SOURCE = "com.imminentmeals.prestige.ModelViewControllerModule";
 		/** Qualified name for the SegueController source code */

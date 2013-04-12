@@ -50,7 +50,7 @@ public class SegueController implements ActivityLifecycleCallbacks {
 	 * {@link android.app.Application#registerActivityLifecycleCallbacks(ActivityLifecycleCallbacks)} before it performs its 
 	 * function.</p>
 	 */
-	public SegueController() {
+	/* package */SegueController() {
 		final ObjectGraph object_graph = ObjectGraph.create(new ModelViewControllerModule());
 		object_graph.inject(this);
 		_presentation_controllers = new ImmutableMap.Builder<Class<? extends Activity>, Provider<? extends ControllerContract>>()
