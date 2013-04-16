@@ -1,7 +1,5 @@
 package com.imminentmeals.prestige.example.presentations.framework;
 
-import static com.imminentmeals.prestige.SegueController.sendMessage;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +13,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.imminentmeals.prestige.Prestige;
 import com.imminentmeals.prestige.example.R.layout;
 import com.imminentmeals.prestige.example.models.NewsCategory;
 import com.imminentmeals.prestige.example.presentations.Messages.NewsReaderPresentation.HeadlineSelected;
@@ -63,7 +62,7 @@ public class HeadlinesFragment extends ListFragment {
 	
 	@Override
 	public void onListItemClick(ListView l, View v, int position, long id) {
-		sendMessage(this, new HeadlineSelected(position));
+		Prestige.sendMessage(this, new HeadlineSelected(position));
 	}
 
 /* Public API */

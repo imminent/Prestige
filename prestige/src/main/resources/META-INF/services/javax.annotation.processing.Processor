@@ -1,1 +1,1 @@
-com.imminentmeals.prestige.Prestige$AnnotationProcessor
+com.imminentmeals.prestige.codegen.AnnotationProcessor

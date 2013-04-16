@@ -21,12 +21,12 @@
     android:orientation="horizontal">
     <fragment android:id="@+id/headlines"
               android:layout_height="fill_parent"
-              android:name="com.imminentmeals.android.newsreader.presentation.framework.HeadlinesFragment"
+              android:name="com.imminentmeals.prestige.example.presentations.framework.HeadlinesFragment"
               android:layout_width="200dp"
               android:layout_marginRight="10dp"/>
     <fragment android:id="@+id/article"
               android:layout_height="fill_parent"
-              android:name="com.imminentmeals.android.newsreader.presentation.framework.ArticleFragment"
+              android:name="com.imminentmeals.prestige.example.presentations.framework.ArticleFragment"
               android:layout_width="fill_parent" />
 </LinearLayout>
 <!-- END_INCLUDE(all) -->

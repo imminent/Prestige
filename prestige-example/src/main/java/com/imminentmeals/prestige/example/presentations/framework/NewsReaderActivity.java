@@ -1,7 +1,5 @@
 package com.imminentmeals.prestige.example.presentations.framework;
 
-import static com.imminentmeals.prestige.SegueController.controller;
-import static com.imminentmeals.prestige.SegueController.sendMessage;
 import static com.imminentmeals.prestige.example.presentations.framework.PresentationUtilities.KEY;
 import android.app.ActionBar;
 import android.app.Activity;
@@ -14,6 +12,8 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import butterknife.InjectView;
 
+import com.imminentmeals.prestige.Prestige;
+import com.imminentmeals.prestige.annotations.InjectDataSource;
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.example.BuildConfig;
 import com.imminentmeals.prestige.example.R.id;
@@ -46,6 +46,7 @@ import com.imminentmeals.prestige.example.presentations.protocols.NewsReaderProt
 public class NewsReaderActivity extends Activity implements NewsReaderPresentation, 
                                                             NewsReaderNavigationCallback {
 	@InjectView(id.article) /* package */View article;
+	@InjectDataSource /* package */NewsReaderProtocol data_source;
 	
 /* Lifecycle */
 	@Override
@@ -61,7 +62,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 		
 		final boolean is_dual_pane = article != null && article.getVisibility() == View.VISIBLE;
 		final int category_index = icicle == null ? 0 : icicle.getInt(_KEY_CATEGORY_INDEX, 0);
-		sendMessage(this, new WillCreatePresentation(is_dual_pane, category_index));
+		Prestige.sendMessage(this, new WillCreatePresentation(is_dual_pane, category_index));
 		
 		// Sets up Headlines
 	    _headlines_fragment.setSelectable(is_dual_pane);
@@ -71,7 +72,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 	@Override
 	protected void onStart() {
 		super.onStart();
-		sendMessage(this, WillStartPresentation.DID_START);
+		Prestige.sendMessage(this, WillStartPresentation.DID_START);
 	}
 
 /* Activity Callbacks */
@@ -83,8 +84,8 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 	/** Save instance state. Saves current category/article index. */
 	@Override
 	protected void onSaveInstanceState(Bundle icicle) {
-		icicle.putInt(_KEY_CATEGORY_INDEX, ((NewsReaderProtocol) controller(this)).categoryIndex());
-		icicle.putInt(_KEY_ARTICLE_INDEX, ((NewsReaderProtocol) controller(this)).articleIndex());
+		icicle.putInt(_KEY_CATEGORY_INDEX, data_source.categoryIndex());
+		icicle.putInt(_KEY_ARTICLE_INDEX, data_source.articleIndex());
 		super.onSaveInstanceState(icicle);
 	}
 
@@ -130,7 +131,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 			.setTitle("Select a Category")
 			.setItems(categories, new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int which) {
-						sendMessage(NewsReaderActivity.this, new CategorySelected(which));
+						Prestige.sendMessage(NewsReaderActivity.this, new CategorySelected(which));
 					}
 			})
 			.create()
@@ -140,7 +141,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 /* NewsReaderNavigationCallback */
 	@Override
 	public void onCategorySelected(int category_index) {
-		sendMessage(this, new CategorySelected(category_index));
+		Prestige.sendMessage(this, new CategorySelected(category_index));
 	}
 	
 /* Helpers */
@@ -149,7 +150,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 	    if (icicle != null) {
 	      final int category_index = icicle.getInt(_KEY_CATEGORY_INDEX, 0);
 	      final int article_index = icicle.getInt(_KEY_ARTICLE_INDEX, -1);
-	      sendMessage(this, new WillRestorePresentation(category_index, article_index));
+	      Prestige.sendMessage(this, new WillRestorePresentation(category_index, article_index));
 	    }
 	  }
 

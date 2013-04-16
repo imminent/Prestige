@@ -5,5 +5,5 @@ package com.imminentmeals.prestige;
  * @author Dandre Allison
  */
 public interface SegueControllerApplication {
-	Object segueController();
+	SegueController segueController();
 }

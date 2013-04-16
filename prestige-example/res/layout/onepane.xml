@@ -22,7 +22,7 @@
 
     <fragment android:id="@+id/headlines"
               android:layout_height="fill_parent"
-              android:name="com.imminentmeals.android.newsreader.presentation.framework.HeadlinesFragment"
+              android:name="com.imminentmeals.prestige.example.presentations.framework.HeadlinesFragment"
               android:layout_width="match_parent" />
 </LinearLayout>
 <!-- END_INCLUDE(all) -->
