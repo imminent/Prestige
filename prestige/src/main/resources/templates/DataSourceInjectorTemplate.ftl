@@ -14,7 +14,7 @@ import com.imminentmeals.prestige.ControllerContract;
 /**
  * <p>Injects the Data Source into {@link ${target}}'s ${variableName}.</p>
  */
-public class ${className} {
+public final class ${className} {
 
 	/**
 	 * <p>Injects the Data Source into {@link ${target}}'s ${variableName}.</p>

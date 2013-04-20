@@ -11,4 +11,7 @@ import javax.annotation.Syntax;
 	private static final String PACKAGE = "com.imminentmeals.prestige.example.presentations.framework";
 	/* package */static final String EXTRA = "extra.";
 	/* package */static final String KEY = "key.";
+	
+/* Private Constructor */
+	private PresentationUtilities() { }
 }

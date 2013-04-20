@@ -10,10 +10,11 @@
 	<parent>
 		<groupId>com.imminentmeals</groupId>
 		<artifactId>prestige-parent</artifactId>
-		<version>0.5</version>
+		<version>0.6-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>prestige</artifactId>
+	<packaging>jar</packaging>
 	<name>Prestige</name>
 
 	<dependencies>
@@ -44,10 +45,10 @@
 			<groupId>com.squareup</groupId>
 			<artifactId>otto</artifactId>
 		</dependency>
-		<!-- FreeMaker: Template Generator -->
+		<!-- JavaWriter: Java source code generation utilities -->
 		<dependency>
-			<groupId>org.freemarker</groupId>
-			<artifactId>freemarker</artifactId>
+		  <groupId>com.squareup</groupId>
+		  <artifactId>javawriter</artifactId>
 		</dependency>
 		<!-- JUnit: Unit Testing -->
 		<dependency>

@@ -82,6 +82,8 @@ public class _SegueController implements SegueController {
 	@Override
 	public void createController(Activity activity) {
 		final Class<?> activity_class = activity.getClass();
+		if (!_presentation_controllers.containsKey(activity_class)) return;
+		
 		final ControllerContract controller = _presentation_controllers.get(activity_class).get();
 		controller.attachPresentation(activity);
 		controller_bus.register(controller);
@@ -91,6 +93,8 @@ public class _SegueController implements SegueController {
 	@Override
 	public void didDestroyActivity(Activity activity) {
 		final Class<?> activity_class = activity.getClass();
+		if (!_presentation_controllers.containsKey(activity_class)) return;
+		
 		controller_bus.unregister(_controllers.get(activity_class));
 		_controllers.remove(activity_class);
 	}

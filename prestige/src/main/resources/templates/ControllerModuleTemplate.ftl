@@ -25,7 +25,7 @@ import javax.inject.Singleton;
 <#list controllers as controller>
  * <li>{@link ${controller.interface}}</li>
 </#list>
- * </ul>
+ * </ul></p>
  */
  @Module(
 	entryPoints = {

@@ -9,7 +9,10 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 import android.app.Activity;
+import android.app.Application;
+import android.app.Application.ActivityLifecycleCallbacks;
 import android.app.Fragment;
+import android.os.Bundle;
 import android.util.Log;
 
 import com.imminentmeals.prestige.codegen.AnnotationProcessor;
@@ -123,6 +126,54 @@ public final class Prestige {
 	 */
 	public static void vanishController(@Nonnull Activity activity) {
 		Finder.ACTIVITY.findSegueControllerApplication(activity).segueController().didDestroyActivity(activity);
+	}
+	
+	/**
+	 * <p>Retrieves the {@link ActivityLifecycleCallbacks} that binds Prestige to the Activity lifecycles so that it can
+	 * conjure Controllers behind the curtains.</p>
+	 * @return The Prestige callbacks
+	 */
+	public static ActivityLifecycleCallbacks activityLifecycleCallbacks() {
+		return new ActivityLifecycleCallbacks() {
+			
+			@Override
+			public void onActivityDestroyed(Activity activity) {
+				vanishController(activity);	
+			}
+			
+			@Override
+			public void onActivityCreated(Activity activity, Bundle __) {
+				conjureController(activity);
+			}
+			
+			@Override
+			public void onActivityStopped(Activity _) { }
+			
+			@Override
+			public void onActivityStarted(Activity _) { }
+			
+			@Override
+			public void onActivitySaveInstanceState(Activity _, Bundle __) { }
+			
+			@Override
+			public void onActivityResumed(Activity _) { }
+			
+			@Override
+			public void onActivityPaused(Activity _) { }
+		};
+	}
+	
+	/**
+	 * <p>Materializes Prestige for the given scope and binds it to the Activity lifecycles in the given Application. This is
+	 * equivalent to how you would use {@link #conjureSegueController(String)} and {@link Prestige#activityLifecycleCallbacks()}
+	 * in most cases.</p>
+	 * @param application
+	 * @param scope
+	 * @return
+	 */
+	public static SegueController materialize(@Nonnull Application application, @Nonnull String scope) {
+		application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks());
+		return conjureSegueController(scope);
 	}
 	
 	/**
