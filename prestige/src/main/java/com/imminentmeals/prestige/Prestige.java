@@ -204,7 +204,7 @@ public final class Prestige {
 		try {
 			final Method inject;
 			if (!_INJECTORS.containsKey(target_class)) {
-				final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.DATA_SOURCE_SUFFIX);
+				final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.DATA_SOURCE_INJECTOR_SUFFIX);
 				inject = injector.getMethod("injectDataSource", Finder.class, target_class);
 				_INJECTORS.put(target_class, inject);
 			} else

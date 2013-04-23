@@ -9,12 +9,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * <p>Marks a class as an implementation of a Controller for the specified scope.</p>
+ * <p>Marks a class as an implementation of a Model in the specified scope.</p>
  * @author Dandre Allison
  */
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
-public @interface ControllerImplementation {
+public @interface ModelImplementation {
 	String value() default PRODUCTION;
 }

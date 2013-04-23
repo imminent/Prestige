@@ -23,7 +23,7 @@ public class ExampleApplication extends Application implements SegueControllerAp
             StrictMode.enableDefaults();
 		super.onCreate();
 		
-		_segue_controller = Prestige.materialize(this, Implementations.PRODUCTION);
+		_segue_controller = Prestige.materialize(this, Implementations.DEVELOPMENT);
 	}
 	
 /* SegueControllerApplication Contract */

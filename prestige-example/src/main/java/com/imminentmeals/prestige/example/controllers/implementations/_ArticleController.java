@@ -2,6 +2,8 @@ package com.imminentmeals.prestige.example.controllers.implementations;
 
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 
+import javax.inject.Inject;
+
 import com.imminentmeals.prestige.annotations.ControllerImplementation;
 import com.imminentmeals.prestige.example.controllers.ArticleController;
 import com.imminentmeals.prestige.example.models.NewsArticle;
@@ -16,6 +18,7 @@ import com.squareup.otto.Subscribe;
  */
 @ControllerImplementation(PRODUCTION)
 class _ArticleController implements ArticleController, Messages.ArticlePresentation {
+	@Inject /* package */NewsSource news_source;
 	
 	@Override
 	public void attachPresentation(Object presentation) {
@@ -31,8 +34,7 @@ class _ArticleController implements ArticleController, Messages.ArticlePresentat
 		}
 		
 		// Display the correct news article.
-	    final NewsArticle article = NewsSource.getInstance().getCategory(message.category_index)
-	        .getArticle(message.article_index);
+	    final NewsArticle article = news_source.categoryForIndex(message.category_index).getArticle(message.article_index);
 	    _presentation.displayArticle(article);
 	}
 
