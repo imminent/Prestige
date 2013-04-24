@@ -2,13 +2,11 @@ package com.imminentmeals.prestige.example.controllers.implementations;
 
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 
-import javax.inject.Inject;
-
 import com.imminentmeals.prestige.annotations.ControllerImplementation;
+import com.imminentmeals.prestige.annotations.InjectModel;
 import com.imminentmeals.prestige.example.controllers.NewsReaderController;
 import com.imminentmeals.prestige.example.models.NewsCategory;
 import com.imminentmeals.prestige.example.models.NewsSource;
-import com.imminentmeals.prestige.example.models.implementations.FakeNewsSource;
 import com.imminentmeals.prestige.example.presentations.Messages;
 import com.imminentmeals.prestige.example.presentations.NewsReaderPresentation;
 import com.squareup.otto.Subscribe;
@@ -19,7 +17,7 @@ import com.squareup.otto.Subscribe;
  */
 @ControllerImplementation(PRODUCTION)
 /* package */class _NewsReaderController implements NewsReaderController, Messages.NewsReaderPresentation {
-	@Inject /* package */NewsSource news_source;
+	@InjectModel /* package */NewsSource news_source;
 
 /* News Reader Controller Contract */
 	@Override

@@ -14,5 +14,7 @@ public interface SegueController {
 	
 	void createController(Activity activity); 
 	
+	<T> T createModel(Class<T> model_interface);
+	
 	void didDestroyActivity(Activity activity);
 }

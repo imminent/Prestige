@@ -91,6 +91,17 @@ public final class Prestige {
 	public static void sendMessage(@Nonnull Fragment fragment, @Nonnull Object message) {
 		Finder.FRAGMENT.findSegueControllerApplication(fragment).segueController().sendMessage(message);
 	}
+	
+	/**
+	 * <p>Sends the given message on the Controller Bus.</p>
+	 * @param message The message to send
+	 */
+	public static void sendMessage(@Nonnull Object message) {
+		if (_segue_controller == null)
+			throw new IllegalStateException("Attempting to send message before Segue Controller was created " +
+					"(Prestige.conjureSegueController(String)).");
+		_segue_controller.sendMessage(message);
+	}
 	  
 	/**
 	 * <p>Creates the {@link SegueController} set for the given implementation scope. The implementation scope specifies
@@ -101,7 +112,8 @@ public final class Prestige {
 	public static SegueController conjureSegueController(@Nonnull String scope) {	
 		try {
 			final Class<?> segue_controller = Class.forName("com.imminentmeals.prestige._SegueController");
-			return (SegueController) segue_controller.getConstructor(String.class).newInstance(scope);
+			_segue_controller = (SegueController) segue_controller.getConstructor(String.class).newInstance(scope);
+			return _segue_controller;
 		} catch (IllegalArgumentException exception) {
 			Log.e("Prestige", "Problem with Prestige setup", exception);
 		} catch (SecurityException exception) {
@@ -194,6 +206,31 @@ public final class Prestige {
 	  }
 
 /* Helpers */
+	/* package */static void injectModels(@Nonnull SegueController segue_controller, @Nonnull Object target) {
+		final Class<?> target_class = target.getClass();
+		try {
+			final Method inject;
+			if (!_INJECTORS.containsKey(target_class)) {
+				final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.MODEL_INJECTOR_SUFFIX);
+				inject = injector.getMethod("injectModels", SegueController.class, target_class);
+				_INJECTORS.put(target_class, inject);
+			} else
+				inject = _INJECTORS.get(target_class);
+			// Allows for no-ops when there's nothing to inject
+			if (inject != null)
+				inject.invoke(null, segue_controller, target);
+		} catch (ClassNotFoundException _) {
+			// Allows injectModels to be called on targets without injected Models
+			_INJECTORS.put(target_class, _NO_OP);
+		} catch (RuntimeException exception) {
+			throw exception;
+		} catch (InvocationTargetException exception) {
+			throw new UnableToInjectException("Unable to inject Models for " + target, exception.getTargetException());
+		} catch (Exception exception) {
+			throw new UnableToInjectException("Unable to inject Models for " + target, exception);
+		}
+	}
+	
 	/**
 	 * <p>Injects a Data Source into the given target.</p>
 	 * @param finder The finder that specifies how to retrieve the Segue Controller from the target
@@ -209,7 +246,7 @@ public final class Prestige {
 				_INJECTORS.put(target_class, inject);
 			} else
 				inject = _INJECTORS.get(target_class);
-			// Allows for no-ops when there's nothing to inject.
+			// Allows for no-ops when there's nothing to inject
 			if (inject != null)
 				inject.invoke(null, finder, target);
 		} catch (ClassNotFoundException _) {
@@ -217,8 +254,10 @@ public final class Prestige {
 			_INJECTORS.put(target_class, _NO_OP);
 		} catch (RuntimeException exception) {
 			throw exception;
+		} catch (InvocationTargetException exception) {
+			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception.getTargetException());
 		} catch (Exception exception) {
-			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception instanceof InvocationTargetException? ((InvocationTargetException) exception).getTargetException() : exception);
+			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception);
 		}
 	}
 	
@@ -230,4 +269,5 @@ public final class Prestige {
 	private static final Map<Class<?>, Method> _INJECTORS = newLinkedHashMap();
 	/** No Data Source to inject */
 	private static final Method _NO_OP = null;
+	private static SegueController _segue_controller;
 }
