@@ -38,11 +38,11 @@
 		</dependency>
 		<!-- Dagger: Compile-time Java dependency injection -->
 		<dependency>
-			<groupId>com.squareup</groupId>
+			<groupId>com.squareup.dagger</groupId>
 			<artifactId>dagger</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.squareup</groupId>
+			<groupId>com.squareup.dagger</groupId>
 			<artifactId>dagger-compiler</artifactId>
 			<optional>true</optional>
 		</dependency>

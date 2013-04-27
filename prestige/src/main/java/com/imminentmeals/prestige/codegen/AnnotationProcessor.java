@@ -622,9 +622,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		JavaWriter java_writer = new JavaWriter(writer);
 		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage("com.imminentmeals.prestige")
-				   .emitStaticImports("com.google.common.collect.Lists.newArrayList",
-						              "com.google.common.collect.Maps.newHashMap")
-				   .emitImports("java.util.HashMap",
+		           .emitImports("java.util.HashMap",
 						        "java.util.List",
 						        "java.util.Map",
 						        "javax.inject.Inject",
@@ -668,7 +666,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
 		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", java.lang.reflect.Modifier.PUBLIC, 
 		        		        "java.lang.String", "scope")
-		           .emitStatement("List<Object> modules = newArrayList()")
+		           .emitStatement("List<Object> modules = new ArrayList<Object>()")
 		           .emitEndOfLineComment("Controller modules");
 		if (!controller_modules.isEmpty()) {
 			for (ModuleData controller_module : controller_modules)
@@ -707,7 +705,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				controller_puts)
 				   .emitStatement(
                 "_model_implementations = ImmutableMap.<Class<?>, Provider<?>>builder()\n%s.build()", model_puts)
-		           .emitStatement("_controllers = newHashMap()")
+		           .emitStatement("_controllers = new HashMap<Class<?>, Provider<?>>()")
 				   .endMethod()
 				   .emitEmptyLine()
 				   // SegueController Contract 
@@ -914,17 +912,19 @@ public class AnnotationProcessor extends AbstractProcessor {
 			else {
 				final List<String> provider_method_parameters = newArrayList();
 				final List<String> constructor_parameters = newArrayList();
+				System.out.println("Model " + model._interface);
 				for (VariableElement parameter : model._parameters) {
+					System.out.print("\t has parameter " + parameter);
+					System.out.println(" of type " + parameter.asType());
+					provider_method_parameters.add(_type_utilities.asElement(parameter.asType()) + "");
 					provider_method_parameters.add(parameter + "");
-					final String variable_name = 
-							CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, parameter.getSimpleName() + "");
-					provider_method_parameters.add(variable_name);
-					constructor_parameters.add(variable_name);
+					constructor_parameters.add(parameter + "");
 				}
+				final String[] parameters = new String[provider_method_parameters.size()];
 				java_writer.emitEmptyLine()
 				           .emitAnnotation(Provides.class)
 				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(), 0, 
-				        	            (String[]) provider_method_parameters.toArray())
+				        		        provider_method_parameters.toArray(parameters))
 				           .emitStatement("return new %s(%s)", model._implementation,
 				        		   Joiner.on(", ").join(constructor_parameters))
 				           .endMethod();

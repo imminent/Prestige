@@ -17,7 +17,6 @@ import android.util.Log;
 
 import com.imminentmeals.prestige.codegen.AnnotationProcessor;
 
-
 /**
  * 
  * @author Dandre Allison
