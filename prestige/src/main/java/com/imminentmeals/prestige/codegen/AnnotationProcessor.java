@@ -56,7 +56,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps.EntryTransformer;
 import com.google.common.io.Closeables;
 import com.imminentmeals.prestige.ControllerContract;
-import com.imminentmeals.prestige.Prestige.Finder;
 import com.imminentmeals.prestige.SegueController;
 import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Controller.Default;
@@ -623,6 +622,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage("com.imminentmeals.prestige")
 		           .emitImports("java.util.HashMap",
+		        		        "java.util.ArrayList",
 						        "java.util.List",
 						        "java.util.Map",
 						        "javax.inject.Inject",
@@ -705,7 +705,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				controller_puts)
 				   .emitStatement(
                 "_model_implementations = ImmutableMap.<Class<?>, Provider<?>>builder()\n%s.build()", model_puts)
-		           .emitStatement("_controllers = new HashMap<Class<?>, Provider<?>>()")
+		           .emitStatement("_controllers = new HashMap<Class<?>, ControllerContract>()")
 				   .endMethod()
 				   .emitEmptyLine()
 				   // SegueController Contract 
@@ -840,7 +840,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		final JavaWriter java_writer = new JavaWriter(writer);
 		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
-		           .emitImports("com.imminentmeals.prestige.Prestige.Finder")
+		           .emitImports(JavaWriter.type(Finder.class))
 			       .emitEmptyLine()
 			       .emitJavadoc("<p>Injects the Data Source into {@link %s}'s %s.</p>", target, variable_name)
 			       .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
