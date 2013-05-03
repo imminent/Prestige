@@ -2,6 +2,7 @@ package com.imminentmeals.prestige.codegen;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Sets.newHashSet;
 import static com.google.common.collect.Maps.transformEntries;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
@@ -39,12 +40,14 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.MirroredTypeException;
+import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.JavaFileObject;
 
 import android.app.Activity;
+import android.app.Fragment;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Function;
@@ -66,6 +69,7 @@ import com.imminentmeals.prestige.annotations.Model;
 import com.imminentmeals.prestige.annotations.ModelImplementation;
 import com.imminentmeals.prestige.annotations.Presentation;
 import com.imminentmeals.prestige.annotations.Presentation.NoProtocol;
+import com.imminentmeals.prestige.annotations.PresentationFragment;
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.java.JavaWriter;
@@ -81,7 +85,9 @@ import dagger.Provides;
                             "com.imminentmeals.prestige.annotations.Controller",
                             "com.imminentmeals.prestige.annotations.ControllerImplementation",
                             "com.imminentmeals.prestige.annotations.Model",
-                            "com.imminentmeals.prestige.annotations.ModelImplementation" })
+                            "com.imminentmeals.prestige.annotations.ModelImplementation",
+                            "com.imminentmeals.prestige.annotations.PresentationFragment",
+                            "com.imminentmeals.prestige.annotations.PresentationFragmentImplemention" })
 public class AnnotationProcessor extends AbstractProcessor {	
 	public static final String DATA_SOURCE_INJECTOR_SUFFIX = "$$DataSourceInjector";
 	public static final String CONTROLLER_MODULE_SUFFIX = "ControllerModule";
@@ -116,6 +122,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 		final Map<String, List<ModelData>> models = newHashMap();
 		final List<ModelData> model_interfaces = newArrayList();
 		final Map<Element, List<ModelInjectionData>> model_injections = newHashMap();
+		
+		final ImmutableMap<Element, PresentationFragmentData> presentation_fragments = processPresentationFragments(environment);
 		
 		// Processes the @Presentation annotations
 		final ImmutableMap<Element, PresentationData> presentations = processPresentations(environment);
@@ -169,6 +177,111 @@ public class AnnotationProcessor extends AbstractProcessor {
 		_type_utilities = null;
 		
 		return true;
+	}
+	
+	/**
+	 * <p>Processes the source code for the @PresentationFragment and @PresentationFragmentImplementation annotations.</p>
+	 * @param environment The round environment
+	 * @return
+	 */
+	private ImmutableMap<Element, PresentationFragmentData> processPresentationFragments(RoundEnvironment environment) {
+		final TypeMirror fragment_type = _element_utilities.getTypeElement(Fragment.class.getCanonicalName()).asType();
+		final Map<Element, Element> presentation_fragment_protocols = newHashMap();
+		final Map<Element, Element> presentation_fragment_implementations = newHashMap();
+		final Map<Element, Set<Element>> unverified_presentation_fragments = newHashMap();
+		
+		for (Element element : environment.getElementsAnnotatedWith(PresentationFragment.class)) {
+			System.out.println("@PresentationFragment is " + element);
+			
+			// Verifies that the target type is an interface
+			if (element.getKind() != INTERFACE) {
+				error(element, "@PresentationFragment annotation may only be specified on interfaces (%s).", element);
+				// Skips the current element
+				continue;
+			}
+			
+			// Verifies that the interface's visibility is public
+			if (!element.getModifiers().contains(PUBLIC)) {
+				error(element, "@PresentationFragment interfaces must be public (%s).", element);
+				// Skips the current element
+				continue;
+			}
+			
+			// Gathers @PresentationFragment information
+			final PresentationFragment presentation_fragment_annotation = element.getAnnotation(PresentationFragment.class);
+			Element protocol = null;
+			List<Element> presentation_fragments = null;
+			try {
+				presentation_fragment_annotation.protocol();
+			} catch (MirroredTypeException exception) {
+				protocol = _type_utilities.asElement(exception.getTypeMirror());
+			}
+			try {
+				presentation_fragment_annotation.presentationFragments();
+			} catch (MirroredTypesException exception) {
+				presentation_fragments = newArrayList();
+				for (TypeMirror presentation_fragment : exception.getTypeMirrors())
+					presentation_fragments.add(_type_utilities.asElement(presentation_fragment));
+			}
+			
+			System.out.println("\twith Protocol: " + protocol);
+			System.out.println("\twith Presentation Fragments: " + presentation_fragments);
+			
+			// Verifies that the Protocol is an Interface
+			if (protocol.getKind() != INTERFACE) {
+				error(element, "@PresentationFragment Protocol must be an interface (%s).",
+					  protocol);
+				// Skips the current element
+				continue;
+			}
+			
+			// Verifies that the Protocol visibility is public
+			if (!protocol.getModifiers().contains(PUBLIC)) {
+				error(element, "@PresentationFragment Protocol must be public (%s).",
+						protocol);
+				// Skips the current element
+				continue;
+			}
+			
+			// Verifies previously unverified Presentation Fragments that use this Presentation Fragment
+			// Notice that these were deferred until this Presentation Fragment was processed
+			if (unverified_presentation_fragments.containsKey(element))
+				for (Element presentation_fragment : unverified_presentation_fragments.get(element)) {
+					final TypeMirror super_protocol = presentation_fragment_protocols.get(presentation_fragment).asType();
+					if (!_type_utilities.isSubtype(super_protocol, protocol.asType())) {
+						error(presentation_fragment, 
+							  "@PresentationFragment Protocol must extend %s from Presentation Fragment %s (%s).",
+							  protocol, element, presentation_fragment);
+						// Skips the current element
+						continue;
+					} else {
+						unverified_presentation_fragments.get(element).remove(presentation_fragment);
+						if (unverified_presentation_fragments.get(element).isEmpty())
+							unverified_presentation_fragments.remove(element);
+					}
+				}
+			
+			// Verifies that the Protocol extends all of the Presentation Fragment's Protocols
+			// Notice that it only checks against the Presentation Fragments that have already been processed
+			for (Element presentation_fragment : presentation_fragments) 
+				if (presentation_fragment_protocols.containsKey(presentation_fragment)) {
+					final TypeMirror sub_protocol = presentation_fragment_protocols.get(presentation_fragment).asType();
+					if (!_type_utilities.isSubtype(protocol.asType(), sub_protocol)) {
+						error(element, 
+							  "@PresentationFragment Protocol must extend %s from Presentation Fragment %s (%s).",
+							  sub_protocol, presentation_fragment, element);
+						// Skips the current element
+						continue;
+					} 
+				} else if (unverified_presentation_fragments.containsKey(presentation_fragment))
+					unverified_presentation_fragments.get(presentation_fragment).add(element);
+				else
+					unverified_presentation_fragments.put(presentation_fragment, newHashSet(element));
+			
+			// Adds the mapping of the Presentation to its Protocol (null if no Protocol is defined)
+			presentation_fragment_protocols.put(element, protocol);
+		}
+		return null;
 	}
 
 	/**
@@ -796,7 +909,11 @@ public class AnnotationProcessor extends AbstractProcessor {
 				                "%s" +
 				                "</ul></p>", controller_list)
 				   .emitAnnotation(Module.class, ImmutableMap.of(
-						   "entryPoints", 
+						   "injects",
+						   "{\n" +
+								   "_SegueController.class" +
+						   "\n}",
+						   /*"entryPoints", 
 						   "{\n" +
 							   Joiner.on(",\n").join(Lists.asList("_SegueController.class", Lists.transform(controllers, 
 									   new Function<ControllerData, String>() {
@@ -806,8 +923,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 											return controller._implementation + ".class";
 										}										
 								}).toArray())) +
-						   "\n}",
+						   "\n}",*/
 						   "overrides", !class_name.equals(_DEFAULT_CONTROLLER_MODULE),
+						   "library", true,
 						   "complete", false))
 					.beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC)
 					.emitEmptyLine()
@@ -886,7 +1004,11 @@ public class AnnotationProcessor extends AbstractProcessor {
 				                "%s" +
 				                "</ul></p>", model_list)
 				   .emitAnnotation(Module.class, ImmutableMap.of(
-						   "entryPoints", 
+						   "injects",
+						   "{\n" +
+								   "_SegueController.class" +
+						   "\n}",
+						   /*"entryPoints", 
 						   "{\n" +
 							   Joiner.on(",\n").join(Lists.asList("_SegueController.class", Lists.transform(models, 
 									   new Function<ModelData, String>() {
@@ -896,8 +1018,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 											return model._implementation + ".class";
 										}										
 								}).toArray())) +
-						   "\n}",
+						   "\n}",*/
 						   "overrides", !class_name.equals(_DEFAULT_MODEL_MODULE),
+						   "library", true,
 						   "complete", false))
 					.beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC)
 					.emitEmptyLine();
@@ -1066,6 +1189,33 @@ public class AnnotationProcessor extends AbstractProcessor {
 			_parameters = parameters;
 			_variable_name = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, model.getSimpleName() + "");
 		}
+	}
+	
+	/**
+	 * <p>Container for Presentation Fragment data.</p>
+	 * @author Dandre Allison
+	 */
+	private static class PresentationFragmentData {
+		/** The Protocol */
+		private final Element _protocol;
+		/** The Presentation Fragment implementation */
+		private final Element _implementation;
+		/** The container */
+		private final int _container;
+		
+		public PresentationFragmentData(Element protocol, Element implementation, int container) {
+			_protocol = protocol;
+			_implementation = implementation;
+			_container = container;
+		}
+		
+		@Override
+		public String toString() {
+			return String.format(format, _protocol, _implementation, _container);
+		}
+		
+		@Syntax("RegEx")
+		private static final String format = "{protocol: %s, implementation: %s}";
 	}
 	
 	/**
