@@ -157,6 +157,18 @@ public final class Prestige {
 	}
 	
 	/**
+	 * <p>Retrieves the Model Implementation for the given Model.</p>
+	 * @param model_interface The given Model
+	 * @return The implementation of the given Model
+	 */
+	public static <T> T getModel(Class<T> model_interface) {
+		if (_segue_controller == null)
+			throw new IllegalStateException("Attempting to get Model before Segue Controller was created " +
+					"(Prestige.conjureSegueController(String)).");
+		return _segue_controller.createModel(model_interface);
+	}
+	
+	/**
 	 * <p>Indicates an unexpected error occurred while trying attempting to inject a Data Source.</p>
 	 * @author Dandre Allison
 	 */
