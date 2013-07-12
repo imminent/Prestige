@@ -3,7 +3,9 @@ package com.imminentmeals.prestige.codegen;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Maps.transformEntries;
+import static com.google.common.collect.Sets.newHashSet;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
+import static java.lang.Math.min;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.element.ElementKind.INTERFACE;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,6 +48,9 @@ import javax.lang.model.util.Types;
 import javax.tools.JavaFileObject;
 
 import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentManager;
+import android.content.Context;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Function;
@@ -53,6 +59,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Maps.EntryTransformer;
 import com.google.common.io.Closeables;
 import com.imminentmeals.prestige.ControllerContract;
@@ -62,14 +69,18 @@ import com.imminentmeals.prestige.annotations.Controller.Default;
 import com.imminentmeals.prestige.annotations.ControllerImplementation;
 import com.imminentmeals.prestige.annotations.InjectDataSource;
 import com.imminentmeals.prestige.annotations.InjectModel;
+import com.imminentmeals.prestige.annotations.InjectPresentationFragment;
 import com.imminentmeals.prestige.annotations.Model;
 import com.imminentmeals.prestige.annotations.ModelImplementation;
 import com.imminentmeals.prestige.annotations.Presentation;
 import com.imminentmeals.prestige.annotations.Presentation.NoProtocol;
+import com.imminentmeals.prestige.annotations.PresentationFragment;
+import com.imminentmeals.prestige.annotations.PresentationFragmentImplementation;
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.java.JavaWriter;
 
+import dagger.Lazy;
 import dagger.Module;
 import dagger.Provides;
 
@@ -81,12 +92,16 @@ import dagger.Provides;
                             "com.imminentmeals.prestige.annotations.Controller",
                             "com.imminentmeals.prestige.annotations.ControllerImplementation",
                             "com.imminentmeals.prestige.annotations.Model",
-                            "com.imminentmeals.prestige.annotations.ModelImplementation" })
+                            "com.imminentmeals.prestige.annotations.ModelImplementation",
+                            "com.imminentmeals.prestige.annotations.PresentationFragment",
+                            "com.imminentmeals.prestige.annotations.PresentationFragmentImplementation",
+                            "com.imminentmeals.prestige.annotations.InjectPresentationFragment" })
 public class AnnotationProcessor extends AbstractProcessor {	
 	public static final String DATA_SOURCE_INJECTOR_SUFFIX = "$$DataSourceInjector";
 	public static final String CONTROLLER_MODULE_SUFFIX = "ControllerModule";
 	public static final String MODEL_INJECTOR_SUFFIX = "$$ModelInjector";
 	public static final String MODEL_MODULE_SUFFIX = "ModelModule";
+	public static final String PRESENTATION_FRAGMENT_INJECTOR_SUFFIX = "$$PresentationFragmentInjector";
 	
 	@Override
 	public SourceVersion getSupportedSourceVersion() {
@@ -116,15 +131,21 @@ public class AnnotationProcessor extends AbstractProcessor {
 		final Map<String, List<ModelData>> models = newHashMap();
 		final List<ModelData> model_interfaces = newArrayList();
 		final Map<Element, List<ModelInjectionData>> model_injections = newHashMap();
+		final Map<Element, List<PresentationFragmentInjectionData>> presentation_fragment_injections = newHashMap();
+		final Map<Element, List<PresentationFragmentInjectionData>> controller_presentation_fragment_injections = newHashMap();
 		
-		// Processes the @Presentation annotations
-		final ImmutableMap<Element, PresentationData> presentations = processPresentations(environment);
+		// Processes the @PresentationFragment and @PresentationFragmentImplementation annotations
+		final ImmutableMap<Element, PresentationFragmentData> presentation_fragments = processPresentationFragments(environment);
+		
+		// Processes the @Presentation and @PresentationImplementation annotations
+		final ImmutableMap<Element, PresentationData> presentations = processPresentations(environment, presentation_fragments);
 		
 		// Processes the @InjectDataSource annotations
-		processDataSourceInjections(environment, data_source_injections, presentations);
+		processDataSourceInjections(environment, data_source_injections, presentations, presentation_fragments);
 		
-		if (!presentations.isEmpty())
-			System.out.println("Presentations data is " + Joiner.on(", ").join(presentations.entrySet()));
+		// Processes the @InjectPresentationFragment annotations
+		processPresentationFragmentInjections(environment, presentation_fragment_injections, 
+				                              controller_presentation_fragment_injections, presentation_fragments);
 		
 		// Processes the @Controller annotations and @ControllerImplementation annotations per @Controller annotation
 		processControllers(environment, presentation_controller_bindings, controllers, presentations);
@@ -134,9 +155,6 @@ public class AnnotationProcessor extends AbstractProcessor {
 		
 		// Processes the @InjectModel annotations
 		processModelInjections(environment, model_injections, model_interfaces);
-		
-		if (!presentation_controller_bindings.isEmpty())
-			System.out.println("Presentation Controller bindings are " + Joiner.on(", ").join(presentation_controller_bindings));
 		
 		// Reformats the gathered information to be used in data models
 		final ImmutableList.Builder<ModuleData> controller_modules = ImmutableList.<ModuleData>builder();
@@ -159,10 +177,32 @@ public class AnnotationProcessor extends AbstractProcessor {
 					                              model_implementations.getKey(),class_name, package_name,
 					                              model_implementations.getValue()));
 		}
+		final Map<Element, Map<Integer, List<PresentationFragmentInjectionData>>> presentation_fragment_display_injections =
+			Maps.transformValues(presentation_fragment_injections, 
+				new Function<List<PresentationFragmentInjectionData>, Map<Integer, List<PresentationFragmentInjectionData>>>() {
+
+					@Nullable public Map<Integer, List<PresentationFragmentInjectionData>> apply(
+							@Nullable List<PresentationFragmentInjectionData> presentation_fragments) {
+						final Map<Integer, List<PresentationFragmentInjectionData>> injections = newHashMap();
+						for (PresentationFragmentInjectionData presentation_fragment : presentation_fragments) {
+							if (presentation_fragment._is_manually_created)
+								// Skips the current injection, since it will be handled manually
+								continue;
+							for (Entry<Integer, Integer> injection : presentation_fragment._displays.entrySet())
+								if (injections.containsKey(injection.getKey()))
+									injections.get(injection.getKey()).add(presentation_fragment);
+								else
+									injections.put(injection.getKey(), newArrayList(presentation_fragment));
+						}
+						return ImmutableMap.copyOf(injections);
+					}
+				});
 		
 		// Generates the code
 		generateSourceCode(presentation_controller_bindings, controller_modules.build(), data_source_injections,
-				           model_modules.build(), model_interfaces, model_injections);
+				           model_modules.build(), model_interfaces, model_injections, 
+				           ImmutableMap.copyOf(presentation_fragment_display_injections),
+				           ImmutableMap.copyOf(controller_presentation_fragment_injections));
 	     
 		// Releases the annotation processing utilities
 		_element_utilities = null;
@@ -170,12 +210,159 @@ public class AnnotationProcessor extends AbstractProcessor {
 		
 		return true;
 	}
+	
+	/**
+	 * <p>Processes the source code for the @PresentationFragment and @PresentationFragmentImplementation annotations.</p>
+	 * @param environment The round environment
+	 * @return
+	 */
+	private ImmutableMap<Element, PresentationFragmentData> processPresentationFragments(RoundEnvironment environment) {
+		final TypeMirror fragment_type = _element_utilities.getTypeElement(Fragment.class.getCanonicalName()).asType();
+		final Map<Element, Element> presentation_fragment_protocols = newHashMap();
+		final Map<Element, Element> presentation_fragment_implementations = newHashMap();
+		final Map<Element, Set<Element>> unverified_presentation_fragments = newHashMap();
+		final TypeMirror no_protocol = _element_utilities.getTypeElement(
+				com.imminentmeals.prestige.annotations.PresentationFragment.NoProtocol.class.getCanonicalName()).asType();
+		
+		for (Element element : environment.getElementsAnnotatedWith(PresentationFragment.class)) {
+			System.out.println("@PresentationFragment is " + element);
+			
+			// Verifies that the target type is an interface
+			if (element.getKind() != INTERFACE) {
+				error(element, "@PresentationFragment annotation may only be specified on interfaces (%s).", element);
+				// Skips the current element
+				continue;
+			}
+			
+			// Verifies that the interface's visibility is public
+			if (!element.getModifiers().contains(PUBLIC)) {
+				error(element, "@PresentationFragment interfaces must be public (%s).", element);
+				// Skips the current element
+				continue;
+			}
+			
+			// Gathers @PresentationFragment information
+			final PresentationFragment presentation_fragment_annotation = element.getAnnotation(PresentationFragment.class);
+			Element protocol = null;
+			try {
+				presentation_fragment_annotation.protocol();
+			} catch (MirroredTypeException exception) {
+				protocol = _type_utilities.asElement(exception.getTypeMirror());
+			}
+			
+			System.out.println("\twith Protocol: " + protocol);
+			
+			// Verifies that the Protocol is an Interface
+			if (protocol.getKind() != INTERFACE) {
+				error(element, "@PresentationFragment Protocol must be an interface (%s).",
+					  protocol);
+				// Skips the current element
+				continue;
+			}
+			
+			// Verifies that the Protocol visibility is public
+			if (!protocol.getModifiers().contains(PUBLIC)) {
+				error(element, "@PresentationFragment Protocol must be public (%s).",
+						protocol);
+				// Skips the current element
+				continue;
+			}
+			
+			protocol = _type_utilities.isSameType(protocol.asType(), no_protocol)? null : protocol;
+			
+			// Verifies previously unverified Presentation Fragments that use this Presentation Fragment
+			// Notice that these were deferred until this Presentation Fragment was processed
+			if (unverified_presentation_fragments.containsKey(element))
+				for (Element presentation_fragment : unverified_presentation_fragments.get(element)) {
+					final TypeMirror super_protocol = presentation_fragment_protocols.get(presentation_fragment).asType();
+					if (!_type_utilities.isSubtype(super_protocol, protocol.asType())) {
+						error(presentation_fragment, 
+							  "@PresentationFragment Protocol must extend %s from Presentation Fragment %s (%s).",
+							  protocol, element, presentation_fragment);
+						// Skips the current element
+						continue;
+					} else {
+						unverified_presentation_fragments.get(element).remove(presentation_fragment);
+						if (unverified_presentation_fragments.get(element).isEmpty())
+							unverified_presentation_fragments.remove(element);
+					}
+				}
+			
+			// Adds the mapping of the Presentation to its Protocol (null if no Protocol is defined)
+			presentation_fragment_protocols.put(element, protocol);
+			
+			// Now that the @PresentationFragment annotation has been verified and its data extracted find its implementations				
+			// TODO: very inefficient
+			for (Element implementation_element : environment.getElementsAnnotatedWith(PresentationFragmentImplementation.class)) {
+				// Makes sure to only deal with Presentation Fragment implementations for the current @PresentationFragment
+				if (!_type_utilities.isSubtype(implementation_element.asType(), element.asType()))
+					continue;
+				
+				System.out.println("\twith an implementation of " + implementation_element);
+				
+				// Verifies that the Presentation Fragment implementation extends from Fragment
+		        if (!_type_utilities.isSubtype(implementation_element.asType(), fragment_type)) {
+		          error(implementation_element, "@PresentationFragmentImplementation classes must extend from Fragment (%s).",
+		                implementation_element); 
+		          // Skips the current element
+		          continue;
+		        }
+		        
+		        // Finds Presentation Fragment injections and verifies that their Protocols are met
+		        for (Element enclosed_element : implementation_element.getEnclosedElements()) {
+		        	if (enclosed_element.getAnnotation(InjectPresentationFragment.class) != null && 
+		        		enclosed_element.getKind() == FIELD) {			
+		    			// Verifies that the Protocol extends all of the Presentation Fragment's Protocols
+		    			// Notice that it only checks against the Presentation Fragments that have already been processed
+		        		final Element sub_presentation_fragment = _type_utilities.asElement(enclosed_element.asType());
+		        		System.out.println("\tcontains Presentation Fragment: " + sub_presentation_fragment);
+	    				if (presentation_fragment_protocols.get(sub_presentation_fragment) != null) {
+	    					final TypeMirror sub_protocol = 
+	    							presentation_fragment_protocols.get(sub_presentation_fragment).asType();
+	    					if (!_type_utilities.isSubtype(protocol.asType(), sub_protocol)) {
+	    						error(implementation_element, 
+	    							  "@PresentationFragment Protocol must extend %s from Presentation Fragment %s (%s).",
+	    							  sub_protocol, sub_presentation_fragment, implementation_element);
+	    						// Skips the current element
+	    						continue;
+	    					} 
+	    				} else if (unverified_presentation_fragments.containsKey(enclosed_element))
+	    					unverified_presentation_fragments.get(enclosed_element).add(element);
+	    				else
+	    					unverified_presentation_fragments.put(enclosed_element, newHashSet(element));
+		        	}
+		        }
+		        
+		        // Adds the implementation to the list of imports
+				presentation_fragment_implementations.put(element, implementation_element);
+			}
+		}
+		
+		// Verifies that all PresentationFragments have been verified
+		final String format = "@PresentationFragment Protocol must extend %s from Presentation Fragment %s (%s).";
+		for (Entry<Element, Set<Element>> entry : unverified_presentation_fragments.entrySet()) {
+			final Element protocol = presentation_fragment_protocols.get(entry.getKey());
+			for (Element element : entry.getValue())
+				error(element, format, protocol, entry.getKey(), element);
+		}
+		
+		System.out.println("Finished processing Presentations Fragment.");
+		return ImmutableMap.copyOf(transformEntries(presentation_fragment_protocols, 
+				new EntryTransformer<Element, Element, PresentationFragmentData>() {
+
+					public PresentationFragmentData transformEntry(@Nonnull Element key, @Nullable Element protocol) {
+						return new PresentationFragmentData(protocol, presentation_fragment_implementations.get(key));
+					}
+			
+		}));
+	}
 
 	/**
 	 * <p>Processes the source code for the @Presentation and @PresentationImplementation annotations.</p>
 	 * @param environment The round environment
 	 */
-	private ImmutableMap<Element, PresentationData> processPresentations(RoundEnvironment environment) {
+	private ImmutableMap<Element, PresentationData> processPresentations(RoundEnvironment environment, 
+			Map<Element, PresentationFragmentData> presentation_fragments) {
 		final TypeMirror activity_type = _element_utilities.getTypeElement(Activity.class.getCanonicalName()).asType();
 		final Map<Element, Element> presentation_protocols = newHashMap();
 		final Map<Element, Element> presentation_implementations = newHashMap();
@@ -246,6 +433,36 @@ public class AnnotationProcessor extends AbstractProcessor {
 		          continue;
 		        }
 		        
+		        // Finds Presentation Fragment injections and verifies that their Protocols are met
+		        for (Element enclosed_element : implementation_element.getEnclosedElements()) {
+		        	if (enclosed_element.getAnnotation(InjectPresentationFragment.class) != null && 
+		        		enclosed_element.getKind() == FIELD) {		
+		        		final Element presentation_fragment = _type_utilities.asElement(enclosed_element.asType()); 
+		    			// Verifies that the Presentation Fragment is an @PresentationFragment
+		        		if (!presentation_fragments.containsKey(presentation_fragment)) {
+		        			error(implementation_element, 
+		        				  "@InjectPresentationFragment must be an @PresentationFragment %s (%s).",
+		        				  presentation_fragment, implementation_element);
+		        			continue;
+		        		}
+		        		
+		        		System.out.println("\tcontains Presentation Fragment: " + presentation_fragment);
+		        		// Retrieves the Presentation Fragment's Protocol
+		        		final Element presentation_fragment_protocol = 
+		        				presentation_fragments.get(presentation_fragment)._protocol;
+		        		
+		        		// Verifies that the Presentation Protocol extends the Presentation Fragment Protocol if one is required
+		        		if (presentation_fragment_protocol != null && 
+		        			!_type_utilities.isSubtype(protocol.asType(), presentation_fragment_protocol.asType())) {
+    						error(implementation_element, 
+    							  "@Presentation Protocol must extend %s from Presentation Fragment %s (%s).",
+    							  presentation_fragment_protocol, presentation_fragment, implementation_element);
+    						// Skips the current element
+    						continue;
+	    				}
+		        	}
+		        }
+		        
 		        // Adds the implementation to the list of imports
 				presentation_implementations.put(element, implementation_element);
 			}
@@ -256,8 +473,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		return ImmutableMap.copyOf(transformEntries(presentation_protocols, 
 				new EntryTransformer<Element, Element, PresentationData>() {
 
-					@Override
-					public PresentationData transformEntry(@Nullable Element key, @Nullable Element protocol) {
+					public PresentationData transformEntry(@Nonnull Element key, @Nullable Element protocol) {
 						return new PresentationData(protocol, presentation_implementations.get(key));
 					}
 			
@@ -266,7 +482,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 	
 	private void processDataSourceInjections(RoundEnvironment environment, 
 			                                 List<DataSourceInjectionData> data_source_injections,
-			                                 ImmutableMap<Element, PresentationData> presentations) {
+			                                 ImmutableMap<Element, PresentationData> presentations,
+			                                 ImmutableMap<Element, PresentationFragmentData> presentation_fragments) {
 		final TypeMirror no_protocol = _element_utilities.getTypeElement(NoProtocol.class.getCanonicalName()).asType();
 
 		for (Element element : environment.getElementsAnnotatedWith(InjectDataSource.class)) {
@@ -275,32 +492,48 @@ public class AnnotationProcessor extends AbstractProcessor {
 			System.out.println("\tin " + enclosing_element);
 			
 			// Verifies containing type is a Presentation Implementation
-	        if (enclosing_element.getAnnotation(PresentationImplementation.class) == null) {
-	          error(element, "@InjectDataSource annotations must be specified in @PresentationImplementation classes (%s).",
+	        if (enclosing_element.getAnnotation(PresentationImplementation.class) == null &&
+	        	enclosing_element.getAnnotation(PresentationFragmentImplementation.class) == null) {
+	          error(element, "@InjectDataSource annotations must be specified in @PresentationImplementation or " +
+	          		" @PresentationFragmentImplementation classes (%s).",
 	              enclosing_element);
 	          // Skips the current element
 	          continue;
 	        }
 			
 	        TypeMirror protocol = no_protocol;
-	        for (PresentationData data : presentations.values())
-	        	if (data._implementation != null && 
-	        	    _type_utilities.isSameType(data._implementation.asType(), enclosing_element.asType())) {
-	        		protocol = data._protocol.asType();
-	        		break;
-	        	}
+	        final boolean is_presentation = enclosing_element.getAnnotation(PresentationFragmentImplementation.class) == null;
+	        // Finds the corresponding Presentation Protocol if enclosing element is a Presentation
+	        if (is_presentation) {
+		        for (PresentationData data : presentations.values())
+		        	if (data._implementation != null && 
+		        	    _type_utilities.isSameType(data._implementation.asType(), enclosing_element.asType())) {
+		        		protocol = data._protocol.asType();
+		        		break;
+		        	}
+	        // Finds the corresponding Presentation Fragment Protocol if enclosing element is a Presentation Fragment
+	        } else {
+        		for (PresentationFragmentData data : presentation_fragments.values())
+		        	if (data._implementation != null && 
+		        	    _type_utilities.isSameType(data._implementation.asType(), enclosing_element.asType())) {
+		        		protocol = data._protocol.asType();
+		        		break;
+		        	}
+	        }
 	        System.out.println("\tdefined Protocol is " + protocol);
 	        // Verifies that Presentation has a Protocol
 	        if (_type_utilities.isSameType(protocol, no_protocol)) {
-	        	error(element, "@InjectDataSource may only be used with Presentations that have a Protocol (%s).",
-	        		  enclosing_element);
+	        	error(element, "@InjectDataSource may only be used with " + 
+	                  (is_presentation? "Presentations" : "Presentation Fragments") + 
+	        		  "that have a Protocol (%s).", enclosing_element);
 	        	// Skips the current element
 	        	continue;
 	        }
 	        // Verifies that the target type is the Presentation's Protocol
 	        if (!_type_utilities.isSameType(element.asType(), protocol)) {
-	          error(element, "@InjectDataSource fields must be the same as the Presentation's Protocol (%s.%s).",
-	              enclosing_element.getQualifiedName(), element);
+	          error(element, "@InjectDataSource fields must be the same as the " +
+	          		(is_presentation? "Presentation's" : "Presentation Fragment's") +
+	          		"Protocol (%s.%s).", enclosing_element.getQualifiedName(), element);
 	          // Skips the current element
 	          continue;
 	        }
@@ -545,11 +778,72 @@ public class AnnotationProcessor extends AbstractProcessor {
 		}
 	}
 	
+	private void processPresentationFragmentInjections(RoundEnvironment environment, 
+            Map<Element, List<PresentationFragmentInjectionData>> presentation_fragment_injections,
+            Map<Element, List<PresentationFragmentInjectionData>> controller_presentation_fragment_injections,
+            Map<Element, PresentationFragmentData> presentation_fragments) {
+		for (Element element : environment.getElementsAnnotatedWith(InjectPresentationFragment.class)) {
+			// Verifies @InjectPresentationFragment is on a field
+			if (element.getKind() != FIELD)
+				continue;
+
+			final TypeElement enclosing_element = (TypeElement) element
+					.getEnclosingElement();
+			System.out.println("@InjectPresentationFragment is " + element);
+			System.out.println("\tin " + enclosing_element);
+
+			// Verifies containing type is a Presentation, Presentation Fragment, or Controller implementation
+			if (enclosing_element.getAnnotation(PresentationImplementation.class) == null && 
+				enclosing_element.getAnnotation(PresentationFragmentImplementation.class) == null &&
+				enclosing_element.getAnnotation(ControllerImplementation.class) == null) {
+				error(element,
+						"@InjectPresentationFragment-annotated fields must be specified in @PresentationImplementation " +
+						"or @PresentationFragmentImplementation classes (%s).",
+						enclosing_element);
+				// Skips the current element
+				continue;
+			}
+
+			// Verifies field properties
+			Set<Modifier> modifiers = element.getModifiers();
+			if (modifiers.contains(PRIVATE) || modifiers.contains(STATIC)) {
+				error(element,
+						"@InjectPresentationFragment fields must not be private or static (%s.%s).",
+						enclosing_element.getQualifiedName(), element);
+				continue;
+			}
+
+			// Gathers the @InjectPresentaionFragment information
+			final String package_name = _element_utilities.getPackageOf(enclosing_element) + "";
+			final String element_class = _element_utilities.getBinaryName((TypeElement) enclosing_element) + "";
+			final InjectPresentationFragment inject_annotation = 
+					element.getAnnotation(InjectPresentationFragment.class);
+			final int[] displays = inject_annotation.value();
+			final String tag = inject_annotation.tag();
+			final boolean is_manually_created = inject_annotation.manual();
+			final PresentationFragmentInjectionData injection = new PresentationFragmentInjectionData(
+					package_name, element, element_class, displays, tag, 
+					presentation_fragments.get(_type_utilities.asElement(element.asType()))._implementation,
+					is_manually_created);
+			if (enclosing_element.getAnnotation(ControllerImplementation.class) != null) {
+				if (controller_presentation_fragment_injections.containsKey(enclosing_element))
+					controller_presentation_fragment_injections.get(enclosing_element).add(injection);
+				else
+					controller_presentation_fragment_injections.put(enclosing_element, newArrayList(injection));
+			} else if (presentation_fragment_injections.containsKey(enclosing_element))
+				presentation_fragment_injections.get(enclosing_element).add(injection);
+			else
+				presentation_fragment_injections.put(enclosing_element, newArrayList(injection));
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	private void generateSourceCode(List<PresentationControllerBinding> controllers, List<ModuleData> controller_modules,
 			                        List<DataSourceInjectionData> data_source_injections,
 			                        List<ModuleData> model_modules, List<ModelData> model_interfaces, 
-			                        Map<Element, List<ModelInjectionData>> model_injections) {
+			                        Map<Element, List<ModelInjectionData>> model_injections,
+			                        Map<Element, Map<Integer, List<PresentationFragmentInjectionData>>> presentation_fragment_injections,
+			                        Map<Element, List<PresentationFragmentInjectionData>> controller_presentation_fragment_injections) {
 		final Filer filer = processingEnv.getFiler();
 		Writer writer = null;
 		try {				
@@ -590,7 +884,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	        }
 	        
 	        // Generates the $$ModelInjectors
-	        for (Map.Entry<Element, List<ModelInjectionData>> injection : model_injections.entrySet()) {
+	        for (Entry<Element, List<ModelInjectionData>> injection : model_injections.entrySet()) {
 	        	final TypeElement element = (TypeElement) injection.getKey();
 	        	final String full_name = element_utilities.getBinaryName(element) + MODEL_INJECTOR_SUFFIX;
 	        	source_code = filer.createSourceFile(full_name, element);
@@ -599,6 +893,28 @@ public class AnnotationProcessor extends AbstractProcessor {
 	        	final String package_name = _element_utilities.getPackageOf(element) + "";
 	        	final String class_name = full_name.substring(package_name.length() + 1);
 	        	generateModelInjector(writer, package_name, injection.getValue(), class_name, element);
+	        }
+	        
+	        // Generates the $$PresentationFragmentInjectors
+	        for (Entry<Element, Map<Integer, List<PresentationFragmentInjectionData>>> injection : presentation_fragment_injections.entrySet()) {
+	        	final TypeElement element = (TypeElement) injection.getKey();
+	        	final String full_name = _element_utilities.getBinaryName(element) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
+	        	source_code = filer.createSourceFile(full_name, element);
+	        	writer = source_code.openWriter();
+	        	writer.flush();
+	        	final String package_name = _element_utilities.getPackageOf(element) + "";
+	        	final String class_name = full_name.substring(package_name.length() + 1);
+	        	generatePresentationFragmentInjector(writer, package_name, injection.getValue(), class_name, element);
+	        }
+	        for (Entry<Element, List<PresentationFragmentInjectionData>> injection : controller_presentation_fragment_injections.entrySet()) {
+	        	final TypeElement element = (TypeElement) injection.getKey();
+	        	final String full_name = _element_utilities.getBinaryName(element) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
+	        	source_code = filer.createSourceFile(full_name, element);
+	        	writer = source_code.openWriter();
+	        	writer.flush();
+	        	final String package_name = _element_utilities.getPackageOf(element) + "";
+	        	final String class_name = full_name.substring(package_name.length() + 1);
+	        	generateControllerPresentationFragmentInjector(writer, package_name, injection.getValue(), class_name, element);
 	        }
 		} catch (IOException exception) {
 			processingEnv.getMessager().printMessage(ERROR, exception.getMessage());
@@ -628,6 +944,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 						        "javax.inject.Inject",
 						        "javax.inject.Named",
 						        "javax.inject.Provider",
+						        JavaWriter.type(Lazy.class),
 						        "android.app.Activity",
 						        "com.google.common.collect.ImmutableMap",
 						        "com.imminentmeals.prestige.ControllerContract",
@@ -657,7 +974,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		for (ModelData model : models) {
 			java_writer.emitJavadoc("Provider for instances of the {@link %s} Model", model._interface)
 			           .emitAnnotation(Inject.class)
-			           .emitField("javax.inject.Provider<" + model._interface + ">", model._variable_name, 0);
+			           .emitField("dagger.Lazy<" + model._interface + ">", model._variable_name, 0);
 			model_puts.append(String.format(".put(%s.class, %s)\n",
 					model._interface, model._variable_name));
 		}
@@ -677,7 +994,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			java_writer.beginControlFlow("if (scope.equals(\"" + controller_modules.get(0)._scope + "\"))")
 		               .emitStatement("modules.add(new %s())", controller_modules.get(0)._qualified_name)
 		               .endControlFlow();
-			for (ModuleData module : controller_modules.subList(1, controller_modules.size()))
+			for (ModuleData module : controller_modules.subList(min(1, controller_modules.size()), controller_modules.size()))
 				java_writer.beginControlFlow("else if (scope.equals(\"" + module._scope + "\"))")
 		                   .emitStatement("modules.add(new %s())", module._qualified_name)
 		                   .endControlFlow();
@@ -704,7 +1021,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				"%s.build()",
 				controller_puts)
 				   .emitStatement(
-                "_model_implementations = ImmutableMap.<Class<?>, Provider<?>>builder()\n%s.build()", model_puts)
+                "_model_implementations = ImmutableMap.<Class<?>, Lazy<?>>builder()\n%s.build()", model_puts)
 		           .emitStatement("_controllers = new HashMap<Class<?>, ControllerContract>()")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -727,9 +1044,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
 				   .emitStatement("final ControllerContract controller = _presentation_controllers.get(activity_class).get()")
-				   .emitStatement("controller.attachPresentation(activity)")
-				   .emitStatement("controller_bus.register(controller)")
 				   .emitStatement("Prestige.injectModels(this, controller)")
+				   .emitStatement("controller.attachPresentation(activity)")
 				   .emitStatement("_controllers.put(activity_class, controller)")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -739,7 +1055,6 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
-				   .emitStatement("controller_bus.unregister(_controllers.get(activity_class))")
 				   .emitStatement("_controllers.remove(activity_class)")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -747,6 +1062,35 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitAnnotation(Override.class)
 				   .beginMethod("<T> T", "createModel", java.lang.reflect.Modifier.PUBLIC, "Class<T>", "model_interface")
 				   .emitStatement("return (T) _model_implementations.get(model_interface).get()")
+				   .endMethod()
+				   .emitEmptyLine()
+				   .emitAnnotation(Override.class)
+				   .beginMethod("void", "attachPresentationFragment", java.lang.reflect.Modifier.PUBLIC,
+						   JavaWriter.type(Activity.class), "activity",
+						   JavaWriter.type(Object.class), "presentation_fragment",
+						   JavaWriter.type(String.class), "tag")
+				   .emitStatement("final ControllerContract controller = _controllers.get(activity.getClass())")
+				   .beginControlFlow("if (controller != null)")
+				   .emitStatement("Prestige.attachPresentationFragment(controller, presentation_fragment, tag)")
+				   .endControlFlow()
+				   .endMethod()
+				   .emitEmptyLine()
+				   .emitAnnotation(Override.class)
+				   .beginMethod("void", "registerForControllerBus", java.lang.reflect.Modifier.PUBLIC,
+						   JavaWriter.type(Activity.class), "activity")
+				   .emitStatement("final Class<?> activity_class = activity.getClass()")
+				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
+				   .emitEmptyLine()
+				   .emitStatement("controller_bus.register(_controllers.get(activity_class))")
+				   .endMethod()
+				   .emitEmptyLine()
+				   .emitAnnotation(Override.class)
+				   .beginMethod("void", "unregisterForControllerBus", java.lang.reflect.Modifier.PUBLIC,
+						   JavaWriter.type(Activity.class), "activity")
+				   .emitStatement("final Class<?> activity_class = activity.getClass()")
+				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
+				   .emitEmptyLine()
+				   .emitStatement("controller_bus.unregister(_controllers.get(activity_class))")
 				   .endMethod()
 				   .emitEmptyLine()
 				   // Private fields
@@ -762,7 +1106,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 						      "_controllers",
 						      java.lang.reflect.Modifier.PRIVATE | java.lang.reflect.Modifier.FINAL)
 				   .emitJavadoc("Provides the Model implementation for the given Model interface")
-				   .emitField("Map<Class<?>, Provider<?>>", "_model_implementations", 
+				   .emitField("Map<Class<?>, Lazy<?>>", "_model_implementations", 
 						      java.lang.reflect.Modifier.PRIVATE | java.lang.reflect.Modifier.FINAL)
 				   .endType()
 				   .emitEmptyLine();
@@ -796,7 +1140,11 @@ public class AnnotationProcessor extends AbstractProcessor {
 				                "%s" +
 				                "</ul></p>", controller_list)
 				   .emitAnnotation(Module.class, ImmutableMap.of(
-						   "entryPoints", 
+						   "injects",
+						   "{\n" +
+								   "_SegueController.class" +
+						   "\n}",
+						   /*"entryPoints", 
 						   "{\n" +
 							   Joiner.on(",\n").join(Lists.asList("_SegueController.class", Lists.transform(controllers, 
 									   new Function<ControllerData, String>() {
@@ -806,8 +1154,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 											return controller._implementation + ".class";
 										}										
 								}).toArray())) +
-						   "\n}",
+						   "\n}",*/
 						   "overrides", !class_name.equals(_DEFAULT_CONTROLLER_MODULE),
+						   "library", true,
 						   "complete", false))
 					.beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC)
 					.emitEmptyLine()
@@ -852,7 +1201,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 			    		        JavaWriter.type(Finder.class), "finder", 
 			    		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target")
 			       .emitStatement("target.%s = " +
-			       		"finder.findSegueControllerApplication(target).segueController().dataSource(target.getClass())", 
+			       		"finder.findSegueControllerApplication(target).segueController().dataSource(" +
+			       		"finder.findContext(target).getClass())", 
 			       		variable_name)
 			       .endMethod()
 			       .endType()
@@ -886,7 +1236,11 @@ public class AnnotationProcessor extends AbstractProcessor {
 				                "%s" +
 				                "</ul></p>", model_list)
 				   .emitAnnotation(Module.class, ImmutableMap.of(
-						   "entryPoints", 
+						   "injects",
+						   "{\n" +
+								   "_SegueController.class" +
+						   "\n}",
+						   /*"entryPoints", 
 						   "{\n" +
 							   Joiner.on(",\n").join(Lists.asList("_SegueController.class", Lists.transform(models, 
 									   new Function<ModelData, String>() {
@@ -896,8 +1250,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 											return model._implementation + ".class";
 										}										
 								}).toArray())) +
-						   "\n}",
+						   "\n}",*/
 						   "overrides", !class_name.equals(_DEFAULT_MODEL_MODULE),
+						   "library", true,
 						   "complete", false))
 					.beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC)
 					.emitEmptyLine();
@@ -906,6 +1261,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			if (model._parameters == null || model._parameters.isEmpty())
 				java_writer.emitEmptyLine()
 				           .emitAnnotation(Provides.class)
+				           .emitAnnotation(Singleton.class)
 				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(), 0)
 				           .emitStatement("return new %s()", model._implementation)
 				           .endMethod();
@@ -923,6 +1279,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				final String[] parameters = new String[provider_method_parameters.size()];
 				java_writer.emitEmptyLine()
 				           .emitAnnotation(Provides.class)
+				           .emitAnnotation(Singleton.class)
 				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(), 0, 
 				        		        provider_method_parameters.toArray(parameters))
 				           .emitStatement("return new %s(%s)", model._implementation,
@@ -941,7 +1298,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 * @param _class_name
 	 */
 	private void generateModelInjector(Writer writer, String package_name, List<ModelInjectionData> injections,
-			                                String class_name, Element target) throws IOException {
+			                           String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
 		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
@@ -961,6 +1318,97 @@ public class AnnotationProcessor extends AbstractProcessor {
 		java_writer.endMethod()
 			       .endType()
 			       .emitEmptyLine();
+		java_writer.close();
+	}
+	
+	
+	private void generateControllerPresentationFragmentInjector(Writer writer, String package_name, 
+			List<PresentationFragmentInjectionData> injections, String class_name, Element target) throws IOException {
+		final JavaWriter java_writer = new JavaWriter(writer);
+		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		           .emitPackage(package_name)
+		           .emitEmptyLine()
+		           .emitEmptyLine()
+		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", class_name)
+		           .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+		           .emitEmptyLine()
+		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
+		        		        "@param int display The current display state\n" +
+		        		        "@param target The target of the injection", target)
+		           .beginMethod("void", "attachPresentationFragment", 
+		        		        java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC,
+		        		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
+		        		        JavaWriter.type(Object.class), "presentation_fragment",
+		        		        JavaWriter.type(String.class), "tag");
+		final String control_format = "%s (presentation_fragment instanceof %s &&\n" +
+		        		              "\ttag.equals(\"%s\"))";
+		if (!injections.isEmpty()) {
+			final PresentationFragmentInjectionData injection = injections.get(0);
+			java_writer.beginControlFlow(String.format(control_format, "if", injection._implementation, injection._tag))
+			           .emitStatement("target.%s = (%s) presentation_fragment", injection._variable_name, 
+			        		          injection._variable.asType())
+			           .endControlFlow();
+		}
+		for (PresentationFragmentInjectionData injection : injections.subList(min(1, injections.size()), injections.size()))
+			java_writer.beginControlFlow(String.format(control_format, "else if", injection._implementation, injection._tag))
+		               .emitStatement("target.%s = (%s) presentation_fragment", injection._variable_name,
+		            		          injection._variable.asType())
+		               .endControlFlow();
+		
+		java_writer.endMethod()
+		           .endType()
+		           .emitEmptyLine();
+		java_writer.close();
+	}
+	
+	private void generatePresentationFragmentInjector(Writer writer, String package_name, 
+			Map<Integer, List<PresentationFragmentInjectionData>> injections, String class_name, Element target) throws IOException {
+		final JavaWriter java_writer = new JavaWriter(writer);
+		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		           .emitPackage(package_name)
+		           .emitEmptyLine()
+		           .emitImports(JavaWriter.type(FragmentManager.class),
+		        		        JavaWriter.type(Fragment.class),
+		        		        JavaWriter.type(Finder.class),
+		        		        JavaWriter.type(Context.class))
+		           .emitEmptyLine()
+		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", target)
+		           .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+		           .emitEmptyLine()
+		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
+		                        "@param finder The finder that specifies how to retrieve the context\n" +
+		        		        "@param int display The current display state\n" +
+		        		        "@param target The target of the injection", target)
+		           .beginMethod("void", "injectPresentationFragments", 
+		        		        java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC,
+		        		        JavaWriter.type(Finder.class), "finder",
+		        		        JavaWriter.type(int.class), "display",
+		        		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
+		if (!injections.isEmpty()) {
+			java_writer.emitStatement("final Context context = finder.findContext(target)")
+			           .emitStatement("final FragmentManager fragment_manager = finder.findFragmentManager(target)")
+			           .beginControlFlow("switch (display)");
+			for (Entry<Integer, List<PresentationFragmentInjectionData>> entry : injections.entrySet()) {
+				java_writer.beginControlFlow("case " + entry.getKey() + ":");
+				final StringBuilder transactions = new StringBuilder();
+				for (PresentationFragmentInjectionData injection : entry.getValue()) {
+					java_writer.emitStatement("target.%s = (%s) Fragment.instantiate(context, \"%s\")", injection._variable_name,
+			                                  injection._variable.asType(), injection._implementation);
+	                transactions.append("\t.add(" +  injection._displays.get(entry.getKey()) + ",\n" +
+			            "\t(Fragment) \ttarget." + injection._variable_name);
+	                if (!injection._tag.isEmpty())
+	                	transactions.append(",\n\"" + injection._tag + "\"");
+	                transactions.append(")\n");
+				}
+				java_writer.emitStatement("fragment_manager.beginTransaction()\n" + transactions + "\t.commit()")
+						   .emitStatement("break")
+		                   .endControlFlow();
+			}
+			java_writer.endControlFlow();
+		}
+		java_writer.endMethod()
+                   .endType()
+                   .emitEmptyLine();
 		java_writer.close();
 	}
 	
@@ -1069,14 +1517,38 @@ public class AnnotationProcessor extends AbstractProcessor {
 	}
 	
 	/**
+	 * <p>Container for Presentation Fragment data.</p>
+	 * @author Dandre Allison
+	 */
+	private static class PresentationFragmentData extends PresentationData {
+		
+		/**
+		 * <p>Constructs a {@link PresentationData}.</p>
+		 * @param protocol The Protocol
+		 * @param implementation The presentation implementation
+		 */
+		public PresentationFragmentData(Element protocol, Element implementation) {
+			super(protocol, implementation);
+		}
+
+		@Override
+		public String toString() {
+			return String.format(format, _protocol, _implementation);
+		}
+		
+		@Syntax("RegEx")
+		private static final String format = "{protocol: %s, implementation: %s}";
+	}
+	
+	/**
 	 * <p>Container for Presentation data.</p>
 	 * @author Dandre Allison
 	 */
 	private static class PresentationData {
 		/** The Protocol */
-		private final Element _protocol;
+		protected final Element _protocol;
 		/** The Presentation implementation */
-		private final Element _implementation;
+		protected final Element _implementation;
 		
 		/**
 		 * <p>Constructs a {@link PresentationData}.</p>
@@ -1153,6 +1625,41 @@ public class AnnotationProcessor extends AbstractProcessor {
 			_variable = variable;
 			_variable_name = variable.getSimpleName() + "";
 			_class_name = element_class.substring(package_name.length() + 1) + MODEL_INJECTOR_SUFFIX;
+		}
+	}
+	
+	private static class PresentationFragmentInjectionData {
+		private final String _package_name;
+		private final Element _variable;
+		private final String _variable_name;
+		private final String _class_name;
+		private final Map<Integer, Integer> _displays;
+		private final String _tag;
+		private final Element _implementation;
+		private final boolean _is_manually_created;
+		
+		public PresentationFragmentInjectionData(String package_name, Element variable, String element_class,
+				int[] displays, String tag, Element implementation, boolean is_manually_created) {
+			assert displays.length % 2 == 0;
+			
+			_package_name = package_name;
+			_variable = variable;
+			_variable_name = variable.getSimpleName() + "";
+			_class_name = element_class.substring(package_name.length() + 1) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
+			_implementation = implementation;
+			_is_manually_created = is_manually_created;
+			
+			if (_is_manually_created) {
+				_displays = null;
+				_tag = null;
+				return;
+			}
+			
+			final ImmutableMap.Builder<Integer, Integer> builder = ImmutableMap.builder();
+			for (int i = 0; i < displays.length; i += 2)
+				builder.put(displays[i], displays[i + 1]);
+			_displays = builder.build();
+			_tag = tag;
 		}
 	}
 	

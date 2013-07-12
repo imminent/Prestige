@@ -17,4 +17,10 @@ public interface SegueController {
 	<T> T createModel(Class<T> model_interface);
 	
 	void didDestroyActivity(Activity activity);
+	
+	void attachPresentationFragment(Activity activity, Object presentation_fragment, String tag);
+	
+	void registerForControllerBus(Activity activity);
+	
+	void unregisterForControllerBus(Activity activity);
 }
