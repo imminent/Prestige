@@ -7,7 +7,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.imminentmeals.prestige.tests</groupId>
-  <artifactId>controller-must-extend-controller-contract</artifactId>
+  <artifactId>presentation-fragment-not-private</artifactId>
   <version>HEAD-SNAPSHOT</version>
 
   <properties>
