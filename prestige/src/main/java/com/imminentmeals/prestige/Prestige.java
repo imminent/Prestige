@@ -1,13 +1,5 @@
 package com.imminentmeals.prestige;
 
-import static com.google.common.collect.Maps.newHashMap;
-
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.Map;
-
-import javax.annotation.Nonnull;
-
 import android.app.Activity;
 import android.app.Application;
 import android.app.Application.ActivityLifecycleCallbacks;
@@ -17,6 +9,14 @@ import android.util.Log;
 
 import com.imminentmeals.prestige.codegen.AnnotationProcessor;
 import com.imminentmeals.prestige.codegen.Finder;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Map;
+
+import javax.annotation.Nonnull;
+
+import static com.google.common.collect.Maps.newHashMap;
 
 /**
  * 
@@ -277,11 +277,39 @@ public final class Prestige {
 			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception);
 		}
 	}
+
+    /**
+     * <p>Injects a Presentation into the given target.</p>
+     * @param target The target of the injection
+     */
+    /* package */static void injectPresentation(@Nonnull Object target, @Nonnull Object presentation) {
+        final Class<?> target_class = target.getClass();
+        try {
+            final Method inject;
+            if (!_PRESENTATION_INJECTORS.containsKey(target_class)) {
+                final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.PRESENTATION_INJECTOR_SUFFIX);
+                inject = injector.getMethod("injectPresentation", target_class, Object.class);
+                _PRESENTATION_INJECTORS.put(target_class, inject);
+            } else
+                inject = _PRESENTATION_INJECTORS.get(target_class);
+            // Allows for no-ops when there's nothing to inject
+            if (inject != null)
+                inject.invoke(null, target, presentation);
+        } catch (ClassNotFoundException _) {
+            // Allows injectPresentation to be called on targets without a presentation field
+            _PRESENTATION_INJECTORS.put(target_class, _NO_OP);
+        } catch (RuntimeException exception) {
+            throw exception;
+        } catch (InvocationTargetException exception) {
+            throw new UnableToInjectException("Unable to inject Presentation for " + target, exception.getTargetException());
+        } catch (Exception exception) {
+            throw new UnableToInjectException("Unable to inject Presentation for " + target, exception);
+        }
+    }
 	
 	/**
 	 * <p>Injects a Presentation Fragment into the given target.</p>
 	 * @param target The target of the injection
-	 * @param fragment The fragment to inject into the target
 	 */
 	/* package */static void injectPresentationFragments(@Nonnull Finder finder, int display, @Nonnull Object target) {
 		final Class<?> target_class = target.getClass();
@@ -347,6 +375,8 @@ public final class Prestige {
 	private static final Map<Class<?>, Method> _DATA_SOURCE_INJECTORS = newHashMap();
 	/** Caches the Presentation Fragment injects previously found to reduce reflection impact */
 	private static final Map<Class<?>, Method> _PRESENTATION_FRAGMENT_INJECTORS = newHashMap();
+    /** Caches the Presentation injects previously found to reduce reflection impact */
+    private static final Map<Class<?>, Method> _PRESENTATION_INJECTORS = newHashMap();
 	/** Caches the Presentation Fragment attaches previously found to reduce reflection impact */
 	private static final Map<Class<?>, Method> _ATTACHERS = newHashMap(); 
 	/** Empty method */
