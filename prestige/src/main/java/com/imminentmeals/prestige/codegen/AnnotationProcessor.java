@@ -32,10 +32,11 @@ import com.imminentmeals.prestige.annotations.PresentationFragment;
 import com.imminentmeals.prestige.annotations.PresentationFragmentImplementation;
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
-import com.squareup.java.JavaWriter;
+import com.squareup.javawriter.JavaWriter;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -81,6 +82,7 @@ import static java.lang.Math.min;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.element.ElementKind.INTERFACE;
+import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
@@ -994,8 +996,10 @@ public class AnnotationProcessor extends AbstractProcessor {
                                                    List<ModuleData> controller_modules, List<ModuleData> model_modules,
                                                    List<ModelData> models)
 			                                        		throws IOException {
+		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
+		final EnumSet<Modifier> private_final = EnumSet.of(PRIVATE, FINAL);
 		JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage("com.imminentmeals.prestige")
 		           .emitImports("java.util.HashMap",
 		        		        "java.util.ArrayList",
@@ -1013,18 +1017,18 @@ public class AnnotationProcessor extends AbstractProcessor {
 					.emitEmptyLine()
 					.emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
 							     "for the current Presentation, and communicating with the Controller Bus.</p>")
-				    .beginType("com.imminentmeals.prestige._SegueController", "class", java.lang.reflect.Modifier.PUBLIC, null, 
+				    .beginType("com.imminentmeals.prestige._SegueController", "class", public_modifier, null, 
 				    		   // implements
 				    		   "com.imminentmeals.prestige.SegueController")
 				    .emitJavadoc("Bus over which Presentations communicate to their Controllers")
 				    .emitAnnotation(Inject.class)
 				    .emitAnnotation(Named.class, ControllerContract.BUS)
-				    .emitField("com.squareup.otto.Bus", "controller_bus", 0);
+				    .emitField("com.squareup.otto.Bus", "controller_bus");
 		final StringBuilder controller_puts = new StringBuilder();
 		for (PresentationControllerBinding binding : controllers) {
 			java_writer.emitJavadoc("Provider for instances of the {@link %s} Controller", binding._controller)
 			           .emitAnnotation(Inject.class)
-			           .emitField("javax.inject.Provider<" + binding._controller + ">", binding._variable_name, 0);
+			           .emitField("javax.inject.Provider<" + binding._controller + ">", binding._variable_name);
 			controller_puts.append(String.format(".put(%s.class, %s)\n", 
 					    binding._presentation_implementation, binding._variable_name));
 		}
@@ -1033,17 +1037,17 @@ public class AnnotationProcessor extends AbstractProcessor {
 		for (ModelData model : models) {
 			java_writer.emitJavadoc("Provider for instances of the {@link %s} Model", model._interface)
 			           .emitAnnotation(Inject.class)
-			           .emitField("dagger.Lazy<" + model._interface + ">", model._variable_name, 0);
+			           .emitField("dagger.Lazy<" + model._interface + ">", model._variable_name);
 			model_puts.append(String.format(".put(%s.class, %s)\n",
 					model._interface, model._variable_name));
 		}
 		// Constructor
 		java_writer.emitEmptyLine()
 		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
-		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", java.lang.reflect.Modifier.PUBLIC, 
+		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier, 
 		        		        "java.lang.String", "scope")
 		           .emitStatement("List<Object> modules = new ArrayList<Object>()")
-		           .emitEndOfLineComment("Controller modules");
+		           .emitSingleLineComment("Controller modules");
 		if (!controller_modules.isEmpty()) {
 			for (ModuleData controller_module : controller_modules)
 				if (controller_module._scope.equals(Implementations.PRODUCTION)) {
@@ -1058,7 +1062,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		                   .emitStatement("modules.add(new %s())", module._qualified_name)
 		                   .endControlFlow();
 		}
-		java_writer.emitEndOfLineComment("Model modules");
+		java_writer.emitSingleLineComment("Model modules");
 		if (!model_modules.isEmpty()) {
 			for (ModuleData model_module : model_modules)
 				if (model_module._scope.equals(Implementations.PRODUCTION)) {
@@ -1087,17 +1091,17 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   // SegueController Contract 
 				   .emitAnnotation(SuppressWarnings.class, JavaWriter.stringLiteral("unchecked"))
 				   .emitAnnotation(Override.class)
-				   .beginMethod("<T> T", "dataSource", java.lang.reflect.Modifier.PUBLIC, "Class<?>", "target")
+				   .beginMethod("<T> T", "dataSource", public_modifier, "Class<?>", "target")
 				   .emitStatement("return (T) _controllers.get(target)")
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "sendMessage", java.lang.reflect.Modifier.PUBLIC, "Object", "message")
+				   .beginMethod("void", "sendMessage", public_modifier, "Object", "message")
 				   .emitStatement("controller_bus.post(message)")
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "createController", java.lang.reflect.Modifier.PUBLIC, 
+				   .beginMethod("void", "createController", public_modifier, 
 						        JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
@@ -1109,7 +1113,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "didDestroyActivity", java.lang.reflect.Modifier.PUBLIC, 
+				   .beginMethod("void", "didDestroyActivity", public_modifier, 
 						   JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
@@ -1119,12 +1123,12 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitEmptyLine()
 				   .emitAnnotation(SuppressWarnings.class, JavaWriter.stringLiteral("unchecked"))
 				   .emitAnnotation(Override.class)
-				   .beginMethod("<T> T", "createModel", java.lang.reflect.Modifier.PUBLIC, "Class<T>", "model_interface")
+				   .beginMethod("<T> T", "createModel", public_modifier, "Class<T>", "model_interface")
 				   .emitStatement("return (T) _model_implementations.get(model_interface).get()")
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "attachPresentationFragment", java.lang.reflect.Modifier.PUBLIC,
+				   .beginMethod("void", "attachPresentationFragment", public_modifier,
 						   JavaWriter.type(Activity.class), "activity",
 						   JavaWriter.type(Object.class), "presentation_fragment",
 						   JavaWriter.type(String.class), "tag")
@@ -1135,7 +1139,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "registerForControllerBus", java.lang.reflect.Modifier.PUBLIC,
+				   .beginMethod("void", "registerForControllerBus", public_modifier,
 						   JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
@@ -1144,7 +1148,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "unregisterForControllerBus", java.lang.reflect.Modifier.PUBLIC,
+				   .beginMethod("void", "unregisterForControllerBus", public_modifier,
 						   JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
@@ -1154,19 +1158,15 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitEmptyLine()
 				   // Private fields
 				   .emitJavadoc("Dependency injection object graph")
-				   .emitField("ObjectGraph", "_object_graph", 
-						      java.lang.reflect.Modifier.PRIVATE | java.lang.reflect.Modifier.FINAL)
+				   .emitField("ObjectGraph", "_object_graph", private_final)
 				   .emitJavadoc("Provides the Controller implementation for the given Presentation Implementation")
 				   .emitField("ImmutableMap<Class<?>, Provider>",
-						      "_presentation_controllers",
-						      java.lang.reflect.Modifier.PRIVATE | java.lang.reflect.Modifier.FINAL)
+						      "_presentation_controllers", private_final)
 				   .emitJavadoc("Maintains the Controller references as they are being used")
 				   .emitField("Map<Class<?>, Object>",
-						      "_controllers",
-						      java.lang.reflect.Modifier.PRIVATE | java.lang.reflect.Modifier.FINAL)
+						      "_controllers", private_final)
 				   .emitJavadoc("Provides the Model implementation for the given Model interface")
-				   .emitField("Map<Class<?>, Lazy>", "_model_implementations", 
-						      java.lang.reflect.Modifier.PRIVATE | java.lang.reflect.Modifier.FINAL)
+				   .emitField("Map<Class<?>, Lazy>", "_model_implementations", private_final)
 				   .endType()
 				   .emitEmptyLine();
 		java_writer.close();
@@ -1180,8 +1180,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 */
 	private void generateControllerModule(Writer writer, String package_name, List<ControllerData> controllers, 
 			                             String class_name) throws IOException {
+		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
 		JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage(package_name)
 				   .emitImports("javax.inject.Named",
 						        "com.imminentmeals.prestige._SegueController",
@@ -1206,19 +1207,20 @@ public class AnnotationProcessor extends AbstractProcessor {
 						   "overrides", !class_name.equals(_DEFAULT_CONTROLLER_MODULE),
 						   "library", true,
 						   "complete", false))
-					.beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC)
+					.beginType(class_name, "class", public_modifier)
 					.emitEmptyLine()
 					.emitAnnotation(Provides.class)
 					.emitAnnotation(Singleton.class)
 					.emitAnnotation(Named.class, ControllerContract.BUS)
-					.beginMethod("com.squareup.otto.Bus", "providesControllerBus", 0)
+					.beginMethod("com.squareup.otto.Bus", "providesControllerBus", EnumSet.noneOf(Modifier.class))
 					.emitStatement("return new Bus(\"Controller Bus\")")
 					.endMethod();
 		// Controller providers
 		for (ControllerData controller : controllers)
 			java_writer.emitEmptyLine()
 			           .emitAnnotation(Provides.class)
-			           .beginMethod(controller._interface + "", "provides" + controller._interface.getSimpleName(), 0)
+			           .beginMethod(controller._interface + "", "provides" + controller._interface.getSimpleName(),
+			        		        EnumSet.noneOf(Modifier.class))
 			           .emitStatement("return new %s()", controller._implementation)
 			           .endMethod();
 		java_writer.endType();
@@ -1235,17 +1237,17 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateDataSourceInjector(Writer writer, String package_name, Element target, String variable_name,
 			                                String class_name) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitImports(JavaWriter.type(Finder.class))
 			       .emitEmptyLine()
 			       .emitJavadoc("<p>Injects the Data Source into {@link %s}'s %s.</p>", target, variable_name)
-			       .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+			       .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 			       .emitEmptyLine()
 			       .emitJavadoc("<p>Injects the Data Source into {@link %s}'s %s.</p>\n" +
 			       		        "@param finder The finder that specifies how to retrieve the Segue Controller from the target\n" +
 			       		        "@param target The target of the injection", target, variable_name)
-			       .beginMethod("void", "injectDataSource", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC, 
+			       .beginMethod("void", "injectDataSource", EnumSet.of(PUBLIC, STATIC), 
 			    		        JavaWriter.type(Finder.class), "finder", 
 			    		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target")
 			       .emitStatement("target.%s = " +
@@ -1267,7 +1269,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateModelModule(Writer writer, String package_name, List<ModelData> models, String class_name) 
 			throws IOException {
 		JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage(package_name)
 				   .emitImports("javax.inject.Named",
 						        "com.imminentmeals.prestige._SegueController",
@@ -1302,7 +1304,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 						   "overrides", !class_name.equals(_DEFAULT_MODEL_MODULE),
 						   "library", true,
 						   "complete", false))
-					.beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC)
+					.beginType(class_name, "class", EnumSet.of(PUBLIC))
 					.emitEmptyLine();
 		// Model providers
 		for (ModelData model : models)
@@ -1310,7 +1312,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 				java_writer.emitEmptyLine()
 				           .emitAnnotation(Provides.class)
 				           .emitAnnotation(Singleton.class)
-				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(), 0)
+				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
+				        		        EnumSet.noneOf(Modifier.class))
 				           .emitStatement("return new %s()", model._implementation)
 				           .endMethod();
 			else {
@@ -1328,7 +1331,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 				java_writer.emitEmptyLine()
 				           .emitAnnotation(Provides.class)
 				           .emitAnnotation(Singleton.class)
-				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(), 0, 
+				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
+				        		        EnumSet.noneOf(Modifier.class), 
 				        		        provider_method_parameters.toArray(parameters))
 				           .emitStatement("return new %s(%s)", model._implementation,
 				        		   Joiner.on(", ").join(constructor_parameters))
@@ -1348,16 +1352,16 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateModelInjector(Writer writer, String package_name, List<ModelInjectionData> injections,
 			                           String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 			       .emitEmptyLine()
 			       .emitJavadoc("<p>Injects the Models into {@link %s}.</p>", class_name)
-			       .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+			       .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 			       .emitEmptyLine()
 			       .emitJavadoc("<p>Injects the Models into {@link %s}.</p>\n" +
 			       		        "@param segue_controller The Segue Controller from which to retrieve Models\n" +
 			       		        "@param target The target of the injection", target)
-			       .beginMethod("void", "injectModels", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC, 
+			       .beginMethod("void", "injectModels", EnumSet.of(PUBLIC, STATIC), 
 			    		        JavaWriter.type(SegueController.class), "segue_controller", 
 			    		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
 		for (ModelInjectionData injection : injections)
@@ -1372,18 +1376,18 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateControllerPresentationFragmentInjector(Writer writer, String package_name, 
 			List<PresentationFragmentInjectionData> injections, String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitEmptyLine()
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", class_name)
-		           .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
 		        		        "@param int display The current display state\n" +
 		        		        "@param target The target of the injection", target)
 		           .beginMethod("void", "attachPresentationFragment", 
-		        		        java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC,
+		        		        EnumSet.of(PUBLIC, STATIC),
 		        		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
 		        		        JavaWriter.type(Object.class), "presentation_fragment",
 		        		        JavaWriter.type(String.class), "tag");
@@ -1411,7 +1415,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generatePresentationFragmentInjector(Writer writer, String package_name, 
 			Map<Integer, List<PresentationFragmentInjectionData>> injections, String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
-		java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitEmptyLine()
 		           .emitImports(JavaWriter.type(FragmentManager.class),
@@ -1420,14 +1424,14 @@ public class AnnotationProcessor extends AbstractProcessor {
 		        		        JavaWriter.type(Context.class))
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", target)
-		           .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
 		                        "@param finder The finder that specifies how to retrieve the context\n" +
 		        		        "@param int display The current display state\n" +
 		        		        "@param target The target of the injection", target)
 		           .beginMethod("void", "injectPresentationFragments", 
-		        		        java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC,
+		        		        EnumSet.of(PUBLIC, STATIC),
 		        		        JavaWriter.type(Finder.class), "finder",
 		        		        JavaWriter.type(int.class), "display",
 		        		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
@@ -1462,18 +1466,18 @@ public class AnnotationProcessor extends AbstractProcessor {
     private void generateControllerPresentationInjector(Writer writer, String package_name, PresentationInjectionData injection,
                                                         String class_name, Element target) throws IOException {
         final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.emitEndOfLineComment("Generated code from Prestige. Do not modify!")
+        java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
                 .emitPackage(package_name)
                 .emitEmptyLine()
                 .emitEmptyLine()
                 .emitJavadoc("<p>Injects the Presentation into {@link %s}.</p>", class_name)
-                .beginType(class_name, "class", java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.FINAL)
+                .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
                 .emitEmptyLine()
                 .emitJavadoc("<p>Injects the Presentation into {@link %s}.</p>\n" +
                         "@param target The target of the injection\n" +
                         "@param presentation The presentation to inject", target)
                 .beginMethod("void", "injectPresentation",
-                        java.lang.reflect.Modifier.PUBLIC | java.lang.reflect.Modifier.STATIC,
+                        EnumSet.of(PUBLIC, STATIC),
                         processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
                         JavaWriter.type(Object.class), "presentation");
         final String control_format = "if (presentation instanceof %s)";
