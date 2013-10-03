@@ -1249,7 +1249,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			       		        "@param target The target of the injection", target, variable_name)
 			       .beginMethod("void", "injectDataSource", EnumSet.of(PUBLIC, STATIC), 
 			    		        JavaWriter.type(Finder.class), "finder", 
-			    		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target")
+			    		        target + "", "target")
 			       .emitStatement("target.%s = " +
 			       		"finder.findSegueControllerApplication(target).segueController().dataSource(" +
 			       		"finder.findContext(target).getClass())", 
