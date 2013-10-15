@@ -34,6 +34,7 @@
 		<android.version_code>16</android.version_code>
 
 		<!-- Enhancements -->
+        <gson.version>2.2.4</gson.version>
 		<otto.version>1.3.4</otto.version>
 		<dagger.version>1.1.0</dagger.version>
 		<butterknife.version>2.0.1</butterknife.version>
@@ -46,6 +47,7 @@
 		<fest.version>2.0M10</fest.version>
 		<fest.android.version>1.0.3</fest.android.version>
 		<robolectric.version>2.1.1</robolectric.version>
+        <compile-test.version>0.3</compile-test.version>
 
 		<!-- Plugins -->
 		<maven-compiler-plugin.version>3.0</maven-compiler-plugin.version>
@@ -72,6 +74,12 @@
 				<artifactId>android</artifactId>
 				<version>${android.version}</version>
 			</dependency>
+            <!-- GSON: JSON stream parser -->
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>${gson.version}</version>
+            </dependency>
 			<!-- Guava: Java utilites -->
 			<dependency>
 				<groupId>com.google.guava</groupId>
@@ -132,6 +140,12 @@
 				<artifactId>robolectric</artifactId>
 				<version>${robolectric.version}</version>
 			</dependency>
+            <!-- Compile-test: Asserting properties of code framework -->
+            <dependency>
+                <groupId>com.google.testing.compile</groupId>
+                <artifactId>compile-testing</artifactId>
+                <version>${compile-test.version}</version>
+            </dependency>
 			<!-- FindBugs: Static analysis tools annotations -->
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>
@@ -178,8 +192,8 @@
 				<artifactId>findbugs-maven-plugin</artifactId>
 				<version>${findbugs-maven-plugin.version}</version>
 				<configuration>
-					<excludeFilterFile>findbugs-filter.xml</excludeFilterFile>
-					<includeFilterFile>findbugs-include.xml</includeFilterFile>
+					<excludeFilterFile>excludeFilter.xml</excludeFilterFile>
+					<includeFilterFile>includeFilter.xml</includeFilterFile>
 					<failOnError>false</failOnError>
 				</configuration>
 				<executions>

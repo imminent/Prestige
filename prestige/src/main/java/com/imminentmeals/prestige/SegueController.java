@@ -2,6 +2,8 @@ package com.imminentmeals.prestige;
 
 import android.app.Activity;
 
+import java.io.IOException;
+
 /**
  *
  * @author Dandre Allison
@@ -23,4 +25,6 @@ public interface SegueController {
 	void registerForControllerBus(Activity activity);
 	
 	void unregisterForControllerBus(Activity activity);
+
+    <T> void store(T object) throws IOException;
 }

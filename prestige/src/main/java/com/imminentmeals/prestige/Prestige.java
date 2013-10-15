@@ -1,5 +1,6 @@
 package com.imminentmeals.prestige;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Application;
 import android.app.Application.ActivityLifecycleCallbacks;
@@ -10,16 +11,19 @@ import android.util.Log;
 import com.imminentmeals.prestige.codegen.AnnotationProcessor;
 import com.imminentmeals.prestige.codegen.Finder;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 
 import javax.annotation.Nonnull;
 
+import static android.os.Build.VERSION_CODES.HONEYCOMB;
+import static android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH;
 import static com.google.common.collect.Maps.newHashMap;
 
 /**
- * 
+ * TODO: can I use interfaces to make this generally applicable to Java while working in an Android environment?
  * @author Dandre Allison
  */
 public final class Prestige {
@@ -92,24 +96,24 @@ public final class Prestige {
 			_segue_controller = (SegueController) segue_controller.getConstructor(String.class).newInstance(scope);
 			return _segue_controller;
 		} catch (IllegalArgumentException exception) {
-			Log.e("Prestige", "Problem with Prestige setup", exception);
+            logProblemWithSetup(exception);
 		} catch (SecurityException exception) {
-			Log.e("Prestige", "Problem with Prestige setup", exception);
+            logProblemWithSetup(exception);
 		} catch (InstantiationException exception) {
-			Log.e("Prestige", "Problem with Prestige setup", exception);
+            logProblemWithSetup(exception);
 		} catch (IllegalAccessException exception) {
-			Log.e("Prestige", "Problem with Prestige setup", exception);
+            logProblemWithSetup(exception);
 		} catch (InvocationTargetException exception) {
-			Log.e("Prestige", "Problem with Prestige setup", exception);
+            logProblemWithSetup(exception);
 		} catch (NoSuchMethodException exception) {
-			Log.e("Prestige", "Problem with Prestige setup", exception);
-		} catch (ClassNotFoundException exception) {
-			Log.e("Prestige", "Generated _SegueController cannot be found", exception);
+            logProblemWithSetup(exception);
+        } catch (ClassNotFoundException exception) {
+			Log.e(_TAG, "Generated _SegueController cannot be found", exception);
 		}
 		return null;
 	}
-	
-	/**
+
+    /**
 	 * <p>Destroys the constructed Controller for the given {@link Activity}.</p>
 	 * @param activity The given Activity
 	 */
@@ -130,6 +134,7 @@ public final class Prestige {
 	 * conjure Controllers behind the curtains.</p>
 	 * @return The Prestige callbacks
 	 */
+    @TargetApi(ICE_CREAM_SANDWICH)
 	public static ActivityLifecycleCallbacks activityLifecycleCallbacks() {
 		return new ActivityLifecycleCallbacks() {
 			
@@ -172,7 +177,9 @@ public final class Prestige {
 	 * @param scope
 	 * @return
 	 */
-	public static SegueController materialize(@Nonnull Application application, @Nonnull String scope) {
+    @TargetApi(ICE_CREAM_SANDWICH)
+	public static <T extends Application & SegueControllerApplication> SegueController materialize(@Nonnull T application
+                                                                                                 , @Nonnull String scope) {
 		application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks());
 		return conjureSegueController(scope);
 	}
@@ -182,6 +189,7 @@ public final class Prestige {
 	 * @param model_interface The given Model
 	 * @return The implementation of the given Model
 	 */
+    @SuppressWarnings("unused")
 	public static <T> T getModel(Class<T> model_interface) {
 		if (_segue_controller == null)
 			throw new IllegalStateException("Attempting to get Model before Segue Controller was created " +
@@ -195,7 +203,8 @@ public final class Prestige {
 	 * @param activity
 	 * @param fragment
 	 */
-	public static void attachPresentationFragment(@Nonnull Activity activity, @Nonnull Fragment fragment) {
+	@TargetApi(HONEYCOMB)
+    public static void attachPresentationFragment(@Nonnull Activity activity, @Nonnull Fragment fragment) {
 		if (_segue_controller == null)
 			throw new IllegalStateException("Attempting to attach Presentation Fragment before Segue Controller was created " +
 					"(Prestige.conjureSegueController(String)).");
@@ -204,9 +213,33 @@ public final class Prestige {
 					fragment.getClass().getCanonicalName());
 		_segue_controller.attachPresentationFragment(activity, fragment, fragment.getTag());
 	}
+
+    @SuppressWarnings("unchecked")
+    public static <T> void store(@Nonnull T source) throws IOException {
+        final Class<?> source_class = source.getClass();
+        try {
+            final Method inject;
+            if (!_MODEL_STORERS.containsKey(source_class)) {
+                final Class<?> injector = Class.forName(source_class.getName() + AnnotationProcessor.MODEL_INJECTOR_SUFFIX);
+                inject = injector.getMethod("storeModels", SegueController.class, source_class);
+                _MODEL_STORERS.put(source_class, inject);
+            } else
+                inject = _MODEL_STORERS.get(source_class);
+            // Allows for no-ops when there's nothing to store
+            if (inject != null)
+                inject.invoke(null, _segue_controller, source);
+        } catch (ClassNotFoundException _) {
+            // Allows injectModels to be called on targets without injected Models
+            _MODEL_STORERS.put(source_class, _NO_OP);
+        } catch (InvocationTargetException exception) {
+            throw new UnableToStoreException("Unable to store Models for " + source, exception.getTargetException());
+        } catch (Exception exception) {
+            throw new UnableToStoreException("Unable to store Models for " + source, exception);
+        }
+    }
 	
 	/**
-	 * <p>Indicates an unexpected error occurred while trying attempting to inject a Data Source.</p>
+	 * <p>Indicates an unexpected error occurred while trying attempting to inject a target.</p>
 	 * @author Dandre Allison
 	 */
 	@SuppressWarnings("serial")
@@ -218,9 +251,26 @@ public final class Prestige {
 		 * @param cause The cause of the error
 		 */
 	    /* package */UnableToInjectException(String message, Throwable cause) {
-	      super(message, cause);
+	        super(message, cause);
 	    }
-	  }
+	}
+
+    /**
+     * <p>Indicates an unexpected error occurred while trying attempting to store a source.</p>
+     * @author Dandre Allison
+     */
+    @SuppressWarnings("serial")
+    public static class UnableToStoreException extends RuntimeException {
+
+        /**
+         * <p>Creates an {@link UnableToStoreException}.</p>
+         * @param message The detailed message
+         * @param cause The cause of the error
+         */
+	    /* package */UnableToStoreException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 
 /* Helpers */
 	/* package */static void injectModels(@Nonnull SegueController segue_controller, @Nonnull Object target) {
@@ -239,8 +289,6 @@ public final class Prestige {
 		} catch (ClassNotFoundException _) {
 			// Allows injectModels to be called on targets without injected Models
 			_MODEL_INJECTORS.put(target_class, _NO_OP);
-		} catch (RuntimeException exception) {
-			throw exception;
 		} catch (InvocationTargetException exception) {
 			throw new UnableToInjectException("Unable to inject Models for " + target, exception.getTargetException());
 		} catch (Exception exception) {
@@ -269,8 +317,6 @@ public final class Prestige {
 		} catch (ClassNotFoundException _) {
 			// Allows injectDataSource to be called on targets without a data source
 			_DATA_SOURCE_INJECTORS.put(target_class, _NO_OP);
-		} catch (RuntimeException exception) {
-			throw exception;
 		} catch (InvocationTargetException exception) {
 			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception.getTargetException());
 		} catch (Exception exception) {
@@ -328,8 +374,6 @@ public final class Prestige {
 		} catch (ClassNotFoundException _) {
 			// Allows injectDataSource to be called on targets without a data source
 			_PRESENTATION_FRAGMENT_INJECTORS.put(target_class, _NO_OP);
-		} catch (RuntimeException exception) {
-			throw exception;
 		} catch (InvocationTargetException exception) {
 			throw new UnableToInjectException("Unable to inject Presentation Fragment for " + target, 
 					                          exception.getTargetException());
@@ -356,21 +400,26 @@ public final class Prestige {
 		} catch (ClassNotFoundException _) {
 			// Allows injectDataSource to be called on targets without a data source
 			_ATTACHERS.put(target_class, _NO_OP);
-		} catch (RuntimeException exception) {
-			throw exception;
 		} catch (InvocationTargetException exception) {
 			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception.getTargetException());
 		} catch (Exception exception) {
 			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception);
 		}
 	}
+
+/* Private Helpers */
+    private static void logProblemWithSetup(Exception exception) {
+        Log.e(_TAG, "Problem with Prestige setup", exception);
+    }
 	
 /* Private Constructor */
 	/** <p>Prevents the {@link Prestige} from being constructed.</p> */
 	private Prestige() { }
 	
-	/** Caches the Model injects previously found to reduce reflection impact */
-	private static final Map<Class<?>, Method> _MODEL_INJECTORS = newHashMap();
+	/** Caches the Model storers previously found to reduce reflection impact */
+	private static final Map<Class<?>, Method> _MODEL_STORERS = newHashMap();
+    /** Caches the Model injects previously found to reduce reflection impact */
+    private static final Map<Class<?>, Method> _MODEL_INJECTORS = newHashMap();
 	/** Caches the Data Source injects previously found to reduce reflection impact */
 	private static final Map<Class<?>, Method> _DATA_SOURCE_INJECTORS = newHashMap();
 	/** Caches the Presentation Fragment injects previously found to reduce reflection impact */
@@ -381,5 +430,6 @@ public final class Prestige {
 	private static final Map<Class<?>, Method> _ATTACHERS = newHashMap(); 
 	/** Empty method */
 	private static final Method _NO_OP = null;
+    private static final String _TAG = "Prestige";
 	private static SegueController _segue_controller;
 }
