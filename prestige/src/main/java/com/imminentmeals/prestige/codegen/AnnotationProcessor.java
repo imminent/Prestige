@@ -68,7 +68,6 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -83,6 +82,7 @@ import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Maps.transformEntries;
 import static com.google.common.collect.Sets.newHashSet;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
+import static com.imminentmeals.prestige.codegen.Utilities.getAnnotation;
 import static java.lang.Math.min;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
@@ -239,7 +239,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		final Map<Element, Element> presentation_fragment_implementations = newHashMap();
 		final Map<Element, Set<Element>> unverified_presentation_fragments = newHashMap();
 		final TypeMirror no_protocol = _element_utilities.getTypeElement(PresentationFragment.NoProtocol.class.getCanonicalName()).asType();
-		
+
 		for (Element element : environment.getElementsAnnotatedWith(PresentationFragment.class)) {
 			note(element, "@PresentationFragment is " + element);
 			
@@ -256,23 +256,19 @@ public class AnnotationProcessor extends AbstractProcessor {
 				// Skips the current element
 				continue;
 			}
-			
-			// Gathers @PresentationFragment information
-			final PresentationFragment presentation_fragment_annotation = element.getAnnotation(PresentationFragment.class);
-			Element protocol = null;
-			try {
-				presentation_fragment_annotation.protocol();
-			} catch (MirroredTypeException exception) {
-				protocol = _type_utilities.asElement(exception.getTypeMirror());
-			}
 
-            if (protocol == null) {
-                error(element, "protocol for presentation %s is null.", presentation_fragment_annotation);
+			// Gathers @PresentationFragment information
+            final Map<String, Object> parsed_annotation = getAnnotation(PresentationFragment.class, element);
+
+            if (parsed_annotation.get("protocol") == null) {
+                error(element, "protocol for presentation %s is null.", element);
                 // Skips the current element
                 continue;
             }
-			
-			note(element, "\twith Protocol: " + protocol);
+
+            final Element protocol = getElement(parsed_annotation.get("protocol"));
+
+            note(element, "\twith Protocol: " + protocol);
 			
 			// Verifies that the Protocol is an Interface
 			if (protocol.getKind() != INTERFACE) {
@@ -289,12 +285,10 @@ public class AnnotationProcessor extends AbstractProcessor {
 				// Skips the current element
 				continue;
 			}
-			
-			protocol = _type_utilities.isSameType(protocol.asType(), no_protocol)? null : protocol;
-			
+
 			// Verifies previously unverified Presentation Fragments that use this Presentation Fragment
 			// Notice that these were deferred until this Presentation Fragment was processed
-			if (unverified_presentation_fragments.containsKey(element))
+			if (!_type_utilities.isSameType(protocol.asType(), no_protocol) && unverified_presentation_fragments.containsKey(element))
 				for (Element presentation_fragment : unverified_presentation_fragments.get(element)) {
 					final TypeMirror super_protocol = presentation_fragment_protocols.get(presentation_fragment).asType();
 					if (!_type_utilities.isSubtype(super_protocol, protocol.asType())) {
@@ -310,7 +304,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 					}
 				}
 			
-			// Adds the mapping of the Presentation to its Protocol (null if no Protocol is defined)
+			// Adds the mapping of the Presentation to its Protocol
 			presentation_fragment_protocols.put(element, protocol);
 			
 			// Now that the @PresentationFragment annotation has been verified and its data extracted find its implementations				
@@ -338,7 +332,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		    			// Notice that it only checks against the Presentation Fragments that have already been processed
 		        		final Element sub_presentation_fragment = _type_utilities.asElement(enclosed_element.asType());
 		        		note(implementation_element, "\tcontains Presentation Fragment: " + sub_presentation_fragment);
-	    				if (presentation_fragment_protocols.get(sub_presentation_fragment) != null) {
+	    				if (!_type_utilities.isSameType(presentation_fragment_protocols.get(sub_presentation_fragment).asType(), no_protocol)) {
 	    					final TypeMirror sub_protocol = 
 	    							presentation_fragment_protocols.get(sub_presentation_fragment).asType();
 	    					if (!_type_utilities.isSubtype(protocol.asType(), sub_protocol)) {
@@ -364,15 +358,17 @@ public class AnnotationProcessor extends AbstractProcessor {
 		final String format = "@PresentationFragment Protocol must extend %s from Presentation Fragment %s (%s).";
 		for (Entry<Element, Set<Element>> entry : unverified_presentation_fragments.entrySet()) {
 			final Element protocol = presentation_fragment_protocols.get(entry.getKey());
-			for (Element element : entry.getValue())
-				error(element, format, protocol, entry.getKey(), element);
+            if (protocol != null)
+			    for (Element element : entry.getValue())
+				    error(element, format, protocol, entry.getKey(), element);
 		}
 		
 		return ImmutableMap.copyOf(transformEntries(presentation_fragment_protocols,
 				new EntryTransformer<Element, Element, PresentationFragmentData>() {
 
 					public PresentationFragmentData transformEntry(@Nonnull Element key, @Nullable Element protocol) {
-						return new PresentationFragmentData(protocol, presentation_fragment_implementations.get(key));
+						return new PresentationFragmentData(protocol == null? _type_utilities.asElement(no_protocol) : protocol
+                                                          , presentation_fragment_implementations.get(key));
 					}
 			
 		}));
@@ -408,19 +404,16 @@ public class AnnotationProcessor extends AbstractProcessor {
 			}
 			
 			// Gathers @Presentation information
-			final Presentation presentation_annotation = element.getAnnotation(Presentation.class);
-			Element protocol = null;
-			try {
-				presentation_annotation.protocol();
-			} catch (MirroredTypeException exception) {
-				protocol = _type_utilities.asElement(exception.getTypeMirror());
-			}
+            final Map<String, Object> parsed_annotation = getAnnotation(Presentation.class, element);
+            final Object protocol_value = parsed_annotation.get("protocol");
 
-            if (protocol == null) {
-                error(element, "protocol for presentation %s is null.", presentation_annotation);
+            if (protocol_value == null) {
+                error(element, "protocol for presentation %s is null.", element);
                 // Skips the current element
                 continue;
             }
+
+            final Element protocol = getElement(protocol_value);
 			
 			note(element, "\twith Protocol: " + protocol);
 			
@@ -455,11 +448,13 @@ public class AnnotationProcessor extends AbstractProcessor {
 				// Verifies that the Presentation implementation extends from Activity
 		        if (!_type_utilities.isSubtype(implementation_element.asType(), activity_type)) {
 		          error(element, "@PresentationImplementation classes must extend from Activity (%s).",
-		                element); 
+		                implementation_element);
 		          // Skips the current element
 		          continue;
 		        }
-		        
+
+                final TypeMirror presentation_fragment_no_protocol = _element_utilities.getTypeElement(
+                        PresentationFragment.NoProtocol.class.getCanonicalName()).asType();
 		        // Finds Presentation Fragment injections and verifies that their Protocols are met
 		        for (Element enclosed_element : implementation_element.getEnclosedElements()) {
 		        	if (enclosed_element.getAnnotation(InjectPresentationFragment.class) != null && 
@@ -479,11 +474,12 @@ public class AnnotationProcessor extends AbstractProcessor {
 		        				presentation_fragments.get(presentation_fragment).protocol;
 		        		
 		        		// Verifies that the Presentation Protocol extends the Presentation Fragment Protocol if one is required
-		        		if (presentation_fragment_protocol != null && 
+		        		if (presentation_fragment_protocol != null &&
+                            !_type_utilities.isSameType(presentation_fragment_no_protocol, presentation_fragment_protocol.asType()) &&
 		        			!_type_utilities.isSubtype(protocol.asType(), presentation_fragment_protocol.asType())) {
     						error(implementation_element, 
-    							  "@Presentation Protocol must extend %s from Presentation Fragment %s (%s).",
-    							  presentation_fragment_protocol, presentation_fragment, implementation_element);
+    							  "@Presentation Protocol must extend %s from Presentation Fragment %s (%s.%s).",
+    							  presentation_fragment_protocol, presentation_fragment, implementation_element, enclosed_element);
     						// Skips the current element
     						continue;
 	    				}
@@ -511,25 +507,28 @@ public class AnnotationProcessor extends AbstractProcessor {
 			                                 ImmutableMap<Element, PresentationData> presentations,
 			                                 ImmutableMap<Element, PresentationFragmentData> presentation_fragments) {
 		final TypeMirror no_protocol = _element_utilities.getTypeElement(NoProtocol.class.getCanonicalName()).asType();
+        final TypeMirror presentation_fragment_no_protocol = _element_utilities.getTypeElement(
+                PresentationFragment.NoProtocol.class.getCanonicalName()).asType();
 
 		for (Element element : environment.getElementsAnnotatedWith(InjectDataSource.class)) {
 			final TypeElement enclosing_element = (TypeElement) element.getEnclosingElement();
 			note(element, "@InjectDataSource is " + element);
 			note(element, "\tin " + enclosing_element);
 			
-			// Verifies containing type is a Presentation Implementation
+			// Verifies containing type is a Presentation or Presentation Fragment Implementation
 	        if (enclosing_element.getAnnotation(PresentationImplementation.class) == null &&
 	        	enclosing_element.getAnnotation(PresentationFragmentImplementation.class) == null) {
 	          error(element, "@InjectDataSource annotations must be specified in @PresentationImplementation or " +
-	          		" @PresentationFragmentImplementation classes (%s).",
+	          		" @PresentationFragmentImplementation-annotated classes (%s).",
 	              enclosing_element);
 	          // Skips the current element
 	          continue;
 	        }
-			
-	        TypeMirror protocol = no_protocol;
+
 	        final boolean is_presentation = enclosing_element.getAnnotation(PresentationFragmentImplementation.class) == null;
-	        // Finds the corresponding Presentation Protocol if enclosing element is a Presentation
+            final TypeMirror element_no_protocol = is_presentation? no_protocol : presentation_fragment_no_protocol;
+            TypeMirror protocol = element_no_protocol;
+            // Finds the corresponding Presentation Protocol if enclosing element is a Presentation
 	        if (is_presentation) {
 		        for (PresentationData data : presentations.values())
 		        	if (data.implementation != null &&
@@ -547,19 +546,19 @@ public class AnnotationProcessor extends AbstractProcessor {
 		        	}
 	        }
 	        note(element, "\tdefined Protocol is " + protocol);
-	        // Verifies that Presentation has a Protocol
-	        if (_type_utilities.isSameType(protocol, no_protocol)) {
+	        // Verifies that Presentation/Presentation Fragment has a Protocol
+	        if (_type_utilities.isSameType(protocol, element_no_protocol)) {
 	        	error(element, "@InjectDataSource may only be used with " + 
 	                  (is_presentation? "Presentations" : "Presentation Fragments") + 
-	        		  "that have a Protocol (%s).", enclosing_element);
+	        		  " that have a Protocol (%s).", enclosing_element);
 	        	// Skips the current element
 	        	continue;
 	        }
-	        // Verifies that the target type is the Presentation's Protocol
+	        // Verifies that the target type is the Presentation/Presentation Fragment's Protocol
 	        if (!_type_utilities.isSameType(element.asType(), protocol)) {
 	          error(element, "@InjectDataSource fields must be the same as the " +
 	          		(is_presentation? "Presentation's" : "Presentation Fragment's") +
-	          		"Protocol (%s.%s).", enclosing_element.getQualifiedName(), element);
+	          		" Protocol, which is %s (%s.%s).", protocol, enclosing_element.getQualifiedName(), element);
 	          // Skips the current element
 	          continue;
 	        }
@@ -574,7 +573,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	        
 	        // Gathers the @InjectDataSource information
 	        final String package_name = _element_utilities.getPackageOf(enclosing_element) + "";
-			final String element_class = _element_utilities.getBinaryName((TypeElement) enclosing_element) + "";
+			final String element_class = _element_utilities.getBinaryName(enclosing_element) + "";
 	        data_source_injections.add(new DataSourceInjectionData(package_name, enclosing_element, element, element_class));
 		}
 	}
@@ -614,36 +613,36 @@ public class AnnotationProcessor extends AbstractProcessor {
 			}
 			
 			// Gathers @Controller information
-			final Controller controller_annotation = element.getAnnotation(Controller.class);
-			Element presentation = null;
-			try {
-				controller_annotation.presentation();
-			} catch (MirroredTypeException exception) {
-				presentation = _type_utilities.asElement(exception.getTypeMirror());
-			}
-
-            if (presentation == null) {
-                error(element, "presentation was null for controller %s", controller_annotation);
+            final Map<String, Object> parsed_annotation = getAnnotation(Controller.class, element);
+            if (parsed_annotation.get("presentation") == null) {
+                error(element, "presentation was null for controller %s", element);
                 // Skips the current element
                 continue;
             }
-			
+
+            Element presentation = getElement(parsed_annotation.get("presentation"));
+
 			// Searches for a matching @Presentation if the Presentation is defined by naming convention
 			if (_type_utilities.isSameType(presentation.asType(), default_presentation)) {
 				final String presentation_from_controller_name = 
 						_CONTROLLER_TO_ROOT.reset(element.getSimpleName()+ "").replaceAll("$1Presentation");
-				for (Element presentation_interface : presentations.keySet()) 
+				for (Element presentation_interface : presentations.keySet())
 					if (presentation_interface.getSimpleName().contentEquals(presentation_from_controller_name)) {
 						presentation = presentation_interface;
 						break;
 					}
+
+                // Didn't find a matching @Presentation
+                if (_type_utilities.isSameType(presentation.asType(), default_presentation))
+                    error(element, "No @Presentation-annotated %s found, implicitly required by %s (in %s)"
+                        , presentation_from_controller_name, element, Joiner.on('\n').join(presentations.keySet()));
 			}
 			
 			note(element, "\tfor Presentation: " + presentation);
 			
 			// Verifies that the Controller's Presentation is a Presentation
 			if (!presentations.containsKey(presentation)) {
-				error(element, "@Controller Presentation must be an @Presentation (%s).", element);
+				error(element, "@Controller Presentation must be an @Presentation (%s).", presentation);
 				// Skips the current element
 				continue;
 			}
@@ -653,7 +652,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			if (!(_type_utilities.isSubtype(protocol.asType(), no_protocol) || 
 				  _type_utilities.isSubtype(element.asType(), protocol.asType()))) {
 				error(element, "@Controller is required to implement Protocol %s by its Presentation (%s).",
-					  protocol, element);
+					  protocol, presentation);
 				// Skips the current element
 				continue;
 			}
@@ -766,19 +765,30 @@ public class AnnotationProcessor extends AbstractProcessor {
 			note(element, "@InjectModel is " + element);
 			note(element, "\tin " + enclosing_element);
 
-			// Verifies containing type is a Controller Implementation
-			if (enclosing_element.getAnnotation(ControllerImplementation.class) == null) {
-				error(element,
-					  "@InjectModel-annotated fields must be specified in @ControllerImplementation classes (%s).",
-					  enclosing_element);
-				// Skips the current element
-				continue;
-			}
+            // TODO: @InjectModel is allowed in unannotated classes now, provide support for such use
+            // Verifies containing type is not a Presentation Implementation
+            if (enclosing_element.getAnnotation(PresentationImplementation.class) != null) {
+                error(element,
+                        "@InjectModel-annotated fields must not be specified in @PresentationImplementation classes (%s).",
+                        enclosing_element);
+                // Skips the current element
+                continue;
+            }
+
+            // Verifies containing type is not a Presentation Fragment Implementation
+            if (enclosing_element.getAnnotation(PresentationFragmentImplementation.class) != null) {
+                error(element,
+                        "@InjectModel-annotated fields must not be specified in @PresentationFragmentImplementation classes (%s).",
+                        enclosing_element);
+                // Skips the current element
+                continue;
+            }
 
 			// Verifies that the target type is a Model
 			note(element, "\tinjecting Model " + element.asType());
 			if (!model_interfaces.contains(_type_utilities.asElement(element.asType()))) {
-				error(element, "@InjectModel must be a Model (%s).", enclosing_element);
+				error(element, "@InjectModel must be a Model (%s.%s)."
+                    , enclosing_element.getQualifiedName(), element);
 				continue;
 			}
 
@@ -792,7 +802,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 
 			// Gathers the @InjectDataSource information
 			final String package_name = _element_utilities.getPackageOf(enclosing_element) + "";
-			final String element_class = _element_utilities.getBinaryName((TypeElement) enclosing_element) + "";
+			final String element_class = _element_utilities.getBinaryName(enclosing_element) + "";
 			final ModelInjectionData injection = new ModelInjectionData(package_name, element, element_class);
 			if (model_injections.containsKey(enclosing_element))
 				model_injections.get(enclosing_element).add(injection);
@@ -821,11 +831,19 @@ public class AnnotationProcessor extends AbstractProcessor {
 				enclosing_element.getAnnotation(ControllerImplementation.class) == null) {
 				error(element,
 						"@InjectPresentationFragment-annotated fields must be specified in @PresentationImplementation " +
-						"or @PresentationFragmentImplementation classes (%s).",
-						enclosing_element);
+						"or @PresentationFragmentImplementation or @ControllerImplementation classes (%s.%s).",
+						enclosing_element.getQualifiedName(), element);
 				// Skips the current element
 				continue;
 			}
+
+            // Verifies type is a Presentation Fragment
+            if (!presentation_fragments.containsKey(_type_utilities.asElement(element.asType()))) {
+                error(element, "@InjectPresentationFragment must be a @PresentationFragment (%s.%s) in (%s)"
+                    , enclosing_element, element, presentation_fragments.keySet());
+                // Skips the current element
+                continue;
+            }
 
 			// Verifies field properties
 			Set<Modifier> modifiers = element.getModifiers();
@@ -1583,7 +1601,18 @@ public class AnnotationProcessor extends AbstractProcessor {
 			error(element, "There must be a non-private @InjectModel or default constructor (%s).", element);
 		return parameters;
 	}
-	
+
+    /**
+     * Retrieves an {@link javax.lang.model.element.Element} from {@code some_class_mirror}.
+     * @param some_class_mirror Some object that should represent a {@link Class} in some form
+     * @return The element for the represented class
+     */
+    private Element getElement(Object some_class_mirror) {
+        return some_class_mirror instanceof Class
+                ? _element_utilities.getTypeElement(((Class) some_class_mirror).getCanonicalName())
+                :  _type_utilities.asElement((TypeMirror) some_class_mirror);
+    }
+
 	/**
 	 * <p>Produces an error message with the given information.</p>
 	 * @param element The element to relate the error message to
