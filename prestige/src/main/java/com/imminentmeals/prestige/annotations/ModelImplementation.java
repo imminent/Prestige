@@ -1,12 +1,12 @@
 package com.imminentmeals.prestige.annotations;
 
-import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+
+import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 
 /**
  * <p>Marks a class as an implementation of a Model in the specified scope.</p>
@@ -17,4 +17,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 public @interface ModelImplementation {
 	String value() default PRODUCTION;
+    boolean serialize() default true;
 }

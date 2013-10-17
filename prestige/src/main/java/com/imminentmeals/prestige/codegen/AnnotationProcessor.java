@@ -41,6 +41,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -81,6 +82,7 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Maps.transformEntries;
 import static com.google.common.collect.Sets.newHashSet;
+import static com.google.common.collect.Sets.newLinkedHashSet;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 import static com.imminentmeals.prestige.codegen.Utilities.getAnnotation;
 import static java.lang.Math.min;
@@ -717,7 +719,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				continue;
 			}
 			
-			model_interfaces.add(new ModelData(element, null, null));
+			model_interfaces.add(new ModelData(element, null, null, false));
 			// Now that the @Controller annotation has been verified and its data extracted find its implementations				
 			// TODO: very inefficient
 			for (Element implementation_element : environment.getElementsAnnotatedWith(ModelImplementation.class)) {
@@ -728,12 +730,14 @@ public class AnnotationProcessor extends AbstractProcessor {
 				note(element, "\twith an implementation of " + implementation_element);
 				
 				// Gathers @ModelImplementation information
-				final String scope = implementation_element.getAnnotation(ModelImplementation.class).value();
-				final PackageElement package_name = _element_utilities.getPackageOf(implementation_element);
+                final ModelImplementation model_implementation = implementation_element.getAnnotation(ModelImplementation.class);
+				final String scope = model_implementation.value();
+                final boolean should_serialize = model_implementation.serialize();
+                final PackageElement package_name = _element_utilities.getPackageOf(implementation_element);
 				final List<ModelData> implementations = models.get(scope);
 				final List<? extends VariableElement> parameters = injectModelConstructor((TypeElement) implementation_element);
 				if (implementations == null)
-					models.put(scope, newArrayList(new ModelData(element, implementation_element, parameters)));
+					models.put(scope, newArrayList(new ModelData(element, implementation_element, parameters, should_serialize)));
 				// Verifies that the scope-grouped @ControllerImplementations are in the same package
 				else if (!_element_utilities.getPackageOf(implementations.get(0)._implementation).equals(package_name)) {
 					error(element, "All @ModelImplementation(\"%s\") must be defined in the same package (%s).",
@@ -741,7 +745,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 					// Skips the current element
 					continue;
 				} else
-					implementations.add(new ModelData(element, implementation_element, parameters));
+					implementations.add(new ModelData(element, implementation_element, parameters, should_serialize));
 			}
 		}
 	}
@@ -1368,52 +1372,62 @@ public class AnnotationProcessor extends AbstractProcessor {
 					.emitEmptyLine();
 		// Model providers
 		for (ModelData model : models) {
-			if (model._parameters == null || model._parameters.isEmpty())
-				java_writer.emitEmptyLine()
-				           .emitAnnotation(Provides.class)
-				           .emitAnnotation(Singleton.class)
-				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
-                                   EnumSet.noneOf(Modifier.class),
-                                   JavaWriter.type(GsonProvider.class), "gson_provider",
-                                   JavaWriter.type(GsonConverter.class, model._interface + ""), "converter")
-                           .emitStatement("final File file = gson_provider.fileFor(" + model._implementation + ".class)")
-                           .beginControlFlow("try")
-				           .emitStatement("return file.exists()? converter.from(new FileInputStream(file)) : new %s()",
-                                   model._implementation)
-                           .nextControlFlow("catch (FileNotFoundException _)")
-                           .emitStatement("return new %s()", model._implementation)
-                           .endControlFlow()
-				           .endMethod();
-			else {
-				final List<String> provider_method_parameters = newArrayList();
-				final List<String> constructor_parameters = newArrayList();
-				for (VariableElement parameter : model._parameters) {
-					provider_method_parameters.add(_type_utilities.asElement(parameter.asType()) + "");
-					provider_method_parameters.add(parameter + "");
-					constructor_parameters.add(parameter + "");
-				}
-				final String[] parameters = new String[provider_method_parameters.size()];
-				java_writer.emitEmptyLine()
-				           .emitAnnotation(Provides.class)
-				           .emitAnnotation(Singleton.class)
-				           .beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
-				        		        EnumSet.noneOf(Modifier.class), 
-				        		        provider_method_parameters.toArray(parameters))
-				           .emitStatement("return new %s(%s)", model._implementation,
-				        		   Joiner.on(", ").join(constructor_parameters))
-				           .endMethod();
-			}
-            // Creates the GsonConverter
             java_writer.emitEmptyLine()
                        .emitAnnotation(Provides.class)
-                       .emitAnnotation(Singleton.class)
-                       .beginMethod(JavaWriter.type(GsonConverter.class, model._interface + ""),
-                                    "provides" + model._implementation.getSimpleName() + "Converter",
-                                    EnumSet.noneOf(Modifier.class),
-                                    JavaWriter.type(GsonProvider.class), "gson_provider")
-                       .emitStatement("return new GsonConverter<" + model._interface + ">(" +
-                                      "gson_provider.gson(), " + model._implementation + ".class)")
-                       .endMethod();
+                       .emitAnnotation(Singleton.class);
+            String[] provider_parameters = model._should_serialize
+                    ? new String[] {
+                        JavaWriter.type(GsonProvider.class)
+                      , "gson_provider"
+                      , JavaWriter.type(GsonConverter.class, model._interface + "")
+                      , "converter" }
+                    : new String[0];
+            final String[] new_instance_format_parameters;
+			if (model._parameters == null || model._parameters.isEmpty()) {
+                new_instance_format_parameters = new String[] { model._implementation + "", "" };
+            } else {
+				final Set<String> provider_method_parameters = newLinkedHashSet(Arrays.asList(provider_parameters));
+				final List<String> constructor_parameters = newArrayList();
+				for (VariableElement parameter : model._parameters) {
+                    final String type = _type_utilities.asElement(parameter.asType()) + "";
+                    if (!provider_method_parameters.contains(type)) {
+                        provider_method_parameters.add(type);
+                        provider_method_parameters.add(parameter + "");
+                    }
+					constructor_parameters.add(parameter + "");
+				}
+                provider_parameters = provider_method_parameters.toArray(provider_parameters);
+                new_instance_format_parameters = new String[] {
+                        model._implementation + ""
+                      , Joiner.on(", ").join(constructor_parameters) };
+			}
+            java_writer.beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
+                    EnumSet.noneOf(Modifier.class), provider_parameters);
+            if (model._should_serialize) {
+                java_writer.emitStatement("final File file = gson_provider.fileFor(" + model._implementation + ".class)")
+                           .beginControlFlow("try")
+                           .emitStatement("return file.exists()? converter.from(new FileInputStream(file)) : new %s(%s)"
+                                        , new_instance_format_parameters)
+                           .nextControlFlow("catch (FileNotFoundException _)")
+                           .emitStatement("return new %s(%s)", new_instance_format_parameters)
+                           .endControlFlow()
+                           .endMethod();
+
+                // Creates the GsonConverter
+                java_writer.emitEmptyLine()
+                        .emitAnnotation(Provides.class)
+                        .emitAnnotation(Singleton.class)
+                        .beginMethod(JavaWriter.type(GsonConverter.class, model._interface + ""),
+                                "provides" + model._implementation.getSimpleName() + "Converter",
+                                EnumSet.noneOf(Modifier.class),
+                                JavaWriter.type(GsonProvider.class), "gson_provider")
+                        .emitStatement("return new GsonConverter<" + model._interface + ">(" +
+                                "gson_provider.gson(), " + model._implementation + ".class)")
+                        .endMethod();
+            } else {
+                java_writer.emitStatement("return new %s(%s)", new_instance_format_parameters)
+                           .endMethod();
+            }
         }
 		java_writer.endType();
 		java_writer.close();
@@ -1689,6 +1703,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		private final Element _interface;
 		private final List<? extends VariableElement> _parameters;
 		private final String _variable_name;
+        private final boolean _should_serialize;
 		
 		/**
 		 * <p>
@@ -1698,11 +1713,13 @@ public class AnnotationProcessor extends AbstractProcessor {
 		 * @param model The @Model
 		 * @param model_implementation The implementation of the @Model
 		 */
-		public ModelData(@Nonnull Element model, Element model_implementation, List<? extends VariableElement> parameters) {
+		public ModelData(@Nonnull Element model, Element model_implementation, List<? extends VariableElement> parameters
+                       , boolean should_serialize) {
 			_implementation = model_implementation;
 			_interface = model;
 			_parameters = parameters;
 			_variable_name = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, model.getSimpleName() + "");
+            _should_serialize = should_serialize;
 		}
 	}
 	
