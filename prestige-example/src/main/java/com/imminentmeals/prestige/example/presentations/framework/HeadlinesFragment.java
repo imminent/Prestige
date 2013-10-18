@@ -62,7 +62,7 @@ public class HeadlinesFragment extends ListFragment {
 	
 	@Override
 	public void onListItemClick(ListView l, View v, int position, long id) {
-		Prestige.sendMessage(this, new HeadlineSelected(position));
+		Prestige.sendMessage(new HeadlineSelected(position));
 	}
 
 /* Public API */

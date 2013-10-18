@@ -27,7 +27,7 @@ public class ArticleActivity extends Activity implements ArticlePresentation {
 	    category_index = getIntent().getExtras().getInt(EXTRA_CATEGORY_INDEX, 0);
 	    article_index = getIntent().getExtras().getInt(EXTRA_ARTICLE_INDEX, 0);
 	    final boolean has_two_panes = getResources().getBoolean(bool.has_two_panes);
-	    Prestige.sendMessage(this, new WillCreatePresentation(has_two_panes, category_index, article_index));
+	    Prestige.sendMessage(new WillCreatePresentation(has_two_panes, category_index, article_index));
 	}
 
 /* ArticlePresentation Contract */

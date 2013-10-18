@@ -60,7 +60,6 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
@@ -368,10 +367,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 		return ImmutableMap.copyOf(transformEntries(presentation_fragment_protocols,
 				new EntryTransformer<Element, Element, PresentationFragmentData>() {
 
-					public PresentationFragmentData transformEntry(@Nonnull Element key, @Nullable Element protocol) {
-						return new PresentationFragmentData(protocol == null? _type_utilities.asElement(no_protocol) : protocol
-                                                          , presentation_fragment_implementations.get(key));
-					}
+					public PresentationFragmentData transformEntry(@Nonnull Element key, @Nullable Element protocol) { return new PresentationFragmentData(protocol == null? _type_utilities.asElement(no_protocol) : protocol
+                                                                                          , presentation_fragment_implementations.get(key)); }
 			
 		}));
 	}
@@ -497,9 +494,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		return ImmutableMap.copyOf(transformEntries(presentation_protocols, 
 				new EntryTransformer<Element, Element, PresentationData>() {
 
-					public PresentationData transformEntry(@Nonnull Element key, @Nullable Element protocol) {
-						return new PresentationData(protocol, presentation_implementations.get(key));
-					}
+					public PresentationData transformEntry(@Nonnull Element key, @Nullable Element protocol) { return new PresentationData(protocol, presentation_implementations.get(key)); }
 			
 		}));
 	}
@@ -699,6 +694,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			                   List<ModelData> model_interfaces) {
         final TypeElement gson_provider = _element_utilities.getTypeElement(GsonProvider.class.getName());
         final Set<Element> elements = (Set<Element>) environment.getElementsAnnotatedWith(Model.class);
+        final Map<Element, Boolean> model_should_be_serialized = newHashMap();
         elements.add(gson_provider);
 		for (Element element : elements) {
 			note(element, "@Model is " + element);
@@ -718,8 +714,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 				// Skips the current element
 				continue;
 			}
-			
-			model_interfaces.add(new ModelData(element, null, null, false));
+
+            model_should_be_serialized.put(element, false);
+//			model_interfaces.add(new ModelData(element, false));
 			// Now that the @Controller annotation has been verified and its data extracted find its implementations				
 			// TODO: very inefficient
 			for (Element implementation_element : environment.getElementsAnnotatedWith(ModelImplementation.class)) {
@@ -746,20 +743,26 @@ public class AnnotationProcessor extends AbstractProcessor {
 					continue;
 				} else
 					implementations.add(new ModelData(element, implementation_element, parameters, should_serialize));
+
+                if (should_serialize) model_should_be_serialized.put(element, true);
 			}
 		}
+
+        // Update model interfaces
+        for (Entry<Element, Boolean> entry : model_should_be_serialized.entrySet())
+            model_interfaces.add(new ModelData(entry.getKey(), entry.getValue()));
 	}
 	
 	private void processModelInjections(RoundEnvironment environment, Map<Element, List<ModelInjectionData>> model_injections,
 			                            List<ModelData> models) {
-		final Set<Element> model_interfaces = ImmutableSet.copyOf(Lists.transform(models, 
-				new Function<ModelData, Element>() {
+		final Set<Element> model_interfaces = ImmutableSet.copyOf(Lists.transform(models,
+                new Function<ModelData, Element>() {
 
-					@Override
-					@Nullable public Element apply(@Nullable ModelData model) {
-						return model == null? null : model._interface;
-					}
-		}));
+                    @Nullable
+                    public Element apply(@Nullable ModelData model) {
+                        return model == null ? null : model._interface;
+                    }
+                }));
 		for (Element element : environment.getElementsAnnotatedWith(InjectModel.class)) {
 			// @InjectModel constructors are processed during @Model processing
 			if (element.getKind() != FIELD) continue;
@@ -804,7 +807,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				continue;
 			}
 
-			// Gathers the @InjectDataSource information
+			// Gathers the @InjectModel information
 			final String package_name = _element_utilities.getPackageOf(enclosing_element) + "";
 			final String element_class = _element_utilities.getBinaryName(enclosing_element) + "";
 			final ModelInjectionData injection = new ModelInjectionData(package_name, element, element_class);
@@ -915,7 +918,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 
             // Gathers the @InjectPresentation information
             final String package_name = _element_utilities.getPackageOf(enclosing_element) + "";
-            final String element_class = _element_utilities.getBinaryName((TypeElement) enclosing_element) + "";
+            final String element_class = _element_utilities.getBinaryName(enclosing_element) + "";
             final PresentationInjectionData injection = new PresentationInjectionData(package_name, element, element_class);
 
             // Verifies only one @InjectPresentation per Controller
@@ -935,7 +938,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	@SuppressWarnings("unchecked")
 	private void generateSourceCode(List<PresentationControllerBinding> controllers, List<ModuleData> controller_modules,
 			                        List<DataSourceInjectionData> data_source_injections,
-			                        List<ModuleData> model_modules, List<ModelData> model_interfaces, 
+			                        List<ModuleData> model_modules, List<ModelData> model_interfaces,
 			                        Map<Element, List<ModelInjectionData>> model_injections,
 			                        Map<Element, Map<Integer, List<PresentationFragmentInjectionData>>> presentation_fragment_injections,
 			                        Map<Element, List<PresentationFragmentInjectionData>> controller_presentation_fragment_injections,
@@ -1036,8 +1039,10 @@ public class AnnotationProcessor extends AbstractProcessor {
 	}
 
 	/**
-	 * @param writer
-	 * @throws IOException
+	 *
+     * @param writer
+     * @param models
+     * @throws IOException
 	 */
 	private void generateSegueControllerSourceCode(Writer writer, List<PresentationControllerBinding> controllers,
                                                    List<ModuleData> controller_modules, List<ModuleData> model_modules,
@@ -1073,10 +1078,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				    .emitJavadoc("Bus over which Presentations communicate to their Controllers")
 				    .emitAnnotation(Inject.class)
 				    .emitAnnotation(Named.class, ControllerContract.BUS)
-				    .emitField("com.squareup.otto.Bus", "controller_bus")
-                    .emitJavadoc("Provides serialization functionality")
-                    .emitAnnotation(Inject.class)
-                    .emitField(JavaWriter.type(Provider.class, JavaWriter.type(GsonProvider.class)), "_gson_provider");
+				    .emitField("com.squareup.otto.Bus", "controller_bus");
 		final StringBuilder controller_puts = new StringBuilder();
 		for (PresentationControllerBinding binding : controllers) {
 			java_writer.emitJavadoc("Provider for instances of the {@link %s} Controller", binding._controller)
@@ -1093,56 +1095,60 @@ public class AnnotationProcessor extends AbstractProcessor {
 			           .emitField("dagger.Lazy<" + model._interface + ">", model._variable_name);
 			model_puts.append(String.format(".put(%s.class, %s)%n",
                     model._interface, model._variable_name));
-            java_writer.emitJavadoc("Provider for {@link %s} for {@link %s}", JavaWriter.type(GsonConverter.class),
-                                    model._interface)
-                       .emitAnnotation(Inject.class)
-                       .emitField(JavaWriter.type(Lazy.class, JavaWriter.type(GsonConverter.class, model._interface + "")),
-                                  model._variable_name + _CONVERTOR);
+            if (model._should_serialize)
+                java_writer.emitJavadoc("Provider for {@link %s} for {@link %s}", JavaWriter.type(GsonConverter.class),
+                                        model._interface)
+                           .emitAnnotation(Inject.class)
+                           .emitField(JavaWriter.type(Lazy.class, JavaWriter.type(GsonConverter.class, model._interface + "")),
+                                   model._variable_name + _CONVERTOR);
 		}
 		// Constructor
 		java_writer.emitEmptyLine()
 		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
-		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier, 
+		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier,
 		        		        "java.lang.String", "scope")
-		           .emitStatement("List<Object> modules = new ArrayList<Object>()")
+		           .emitStatement("final List<Object> modules = new ArrayList<Object>()")
 		           .emitSingleLineComment("Controller modules");
+        final String else_if = "else if";
+        String if_else_if_control = "if";
 		if (!controller_modules.isEmpty()) {
+            String production_module = null;
 			for (ModuleData controller_module : controller_modules)
 				if (controller_module._scope.equals(Implementations.PRODUCTION)) {
-					java_writer.emitStatement("modules.add(new %s())", controller_module._qualified_name);
-					break;
-				}
-			java_writer.beginControlFlow("if (scope.equals(\"" + controller_modules.get(0)._scope + "\"))")
-		               .emitStatement("modules.add(new %s())", controller_modules.get(0)._qualified_name)
-		               .endControlFlow();
-			for (ModuleData module : controller_modules.subList(min(1, controller_modules.size()), controller_modules.size()))
-				java_writer.beginControlFlow("else if (scope.equals(\"" + module._scope + "\"))")
-		                   .emitStatement("modules.add(new %s())", module._qualified_name)
-		                   .endControlFlow();
+					production_module = String.format(Locale.US, "modules.add(new %s())", controller_module._qualified_name);
+				} else {
+                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
+                                                             , if_else_if_control, controller_module._scope))
+                               .emitStatement("modules.add(new %s())", controller_module._qualified_name)
+                               .endControlFlow();
+                    if_else_if_control = else_if;
+                }
+            if (production_module != null) java_writer.emitStatement(production_module);
 		}
 		java_writer.emitSingleLineComment("Model modules");
 		if (!model_modules.isEmpty()) {
+            if_else_if_control = "if";
+            String production_module = null;
 			for (ModuleData model_module : model_modules)
 				if (model_module._scope.equals(Implementations.PRODUCTION)) {
-					java_writer.emitStatement("modules.add(new %s())", model_module._qualified_name);
-					break;
-				}
-			java_writer.beginControlFlow("if (scope.equals(\"" + model_modules.get(0)._scope + "\"))")
-		               .emitStatement("modules.add(new %s())", model_modules.get(0)._qualified_name)
-		               .endControlFlow();
-			for (ModuleData module : model_modules.subList(1, model_modules.size()))
-				java_writer.beginControlFlow("else if (scope.equals(\"" + module._scope + "\"))")
-		        .emitStatement("modules.add(new %s())", module._qualified_name)
-		        .endControlFlow();
+					production_module = String.format(Locale.US, "modules.add(new %s())", model_module._qualified_name);
+				} else {
+                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
+                                                             , if_else_if_control, model_module._scope))
+                               .emitStatement("modules.add(new %s())", model_module._qualified_name)
+                               .endControlFlow();
+                    if_else_if_control = else_if;
+                }
+            if (production_module != null) java_writer.emitStatement(production_module);
 		}
 		java_writer.emitStatement("_object_graph = ObjectGraph.create(modules.toArray())")
 		           .emitStatement("_object_graph.inject(this)")
 		           .emitStatement(
-				"_presentation_controllers = ImmutableMap.<Class<?>, Provider>builder()\n" +
+				"_presentation_controllers = ImmutableMap.<Class<?>, Provider>builder()%n" +
 				"%s.build()",
 				controller_puts)
 				   .emitStatement(
-                "_model_implementations = ImmutableMap.<Class<?>, Lazy>builder()\n%s.build()", model_puts)
+                "_model_implementations = ImmutableMap.<Class<?>, Lazy>builder()%n%s.build()", model_puts)
 		           .emitStatement("_controllers = new HashMap<Class<?>, Object>()")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -1165,8 +1171,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
 				   .emitStatement("final Object controller = _presentation_controllers.get(activity_class).get()")
-				   .emitStatement("Prestige.injectModels(this, controller)")
-                   .emitStatement("Prestige.injectPresentation(controller, activity)")
+				   .emitStatement("Prestige.injectModels(controller)")
+                   .emitStatement("Prestige.attachPresentation(controller, activity)")
 				   .emitStatement("_controllers.put(activity_class, controller)")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -1215,15 +1221,17 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .endMethod()
 				   .emitEmptyLine()
                    .emitAnnotation(Override.class)
-                   .beginMethod("<T> void", "store", public_modifier, newArrayList("T", "object"), newArrayList(JavaWriter.type(IOException.class)));
-        String control_if_else_if = "if";
-        final String else_if = "else if";
+                   .beginMethod("<T> void", "store", public_modifier, newArrayList("T", "object")
+                           , newArrayList(JavaWriter.type(IOException.class)));
+        if_else_if_control = "if";
         for (ModelData model : models) {
-            java_writer.beginControlFlow(String.format("%s (object instanceof %s)", control_if_else_if, model._interface))
-                       .emitStatement("%s.get().toStream((%s) object, _gson_provider.get().outputStreamFor(%s.class))"
+            if (!model._should_serialize) continue;
+
+            java_writer.beginControlFlow(String.format("%s (object instanceof %s)", if_else_if_control, model._interface))
+                       .emitStatement("%s.get().toStream((%s) object, gson_provider.get().outputStreamFor(%s.class))"
                                     , model._variable_name + _CONVERTOR, model._interface, model._interface)
                        .endControlFlow();
-            control_if_else_if = else_if;
+            if_else_if_control = else_if;
         }
         java_writer.endMethod()
                    .emitEmptyLine()
@@ -1315,13 +1323,15 @@ public class AnnotationProcessor extends AbstractProcessor {
 			       .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 			       .emitEmptyLine()
 			       .emitJavadoc("<p>Injects the Data Source into {@link %s}'s %s.</p>\n" +
-			       		        "@param finder The finder that specifies how to retrieve the Segue Controller from the target\n" +
+                                "@param segue_controller The Segue Controller\n" +
+			       		        "@param finder The finder that specifies how to retrieve the context from the target\n" +
 			       		        "@param target The target of the injection", target, variable_name)
-			       .beginMethod("void", "injectDataSource", EnumSet.of(PUBLIC, STATIC), 
+			       .beginMethod("void", "injectDataSource", EnumSet.of(PUBLIC, STATIC),
+                                JavaWriter.type(SegueController.class), "segue_controller",
 			    		        JavaWriter.type(Finder.class), "finder", 
 			    		        target + "", "target")
 			       .emitStatement("target.%s = " +
-			       		"finder.findSegueControllerApplication(target).segueController().dataSource(" +
+			       		"segue_controller.dataSource(" +
 			       		"finder.findContext(target).getClass())", 
 			       		variable_name)
 			       .endMethod()
@@ -1450,9 +1460,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 			       .emitJavadoc("<p>Injects the Models into {@link %s}.</p>\n" +
 			       		        "@param segue_controller The Segue Controller from which to retrieve Models\n" +
 			       		        "@param target The target of the injection", target)
-			       .beginMethod("void", "injectModels", EnumSet.of(PUBLIC, STATIC), 
-			    		        JavaWriter.type(SegueController.class), "segue_controller", 
-			    		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
+			       .beginMethod("void", "injectModels", EnumSet.of(PUBLIC, STATIC),
+			    		        JavaWriter.type(SegueController.class), "segue_controller",
+                                ((TypeElement) target).getQualifiedName() + "", "target");
 		for (ModelInjectionData injection : injections)
 			java_writer.emitStatement("target.%s = segue_controller.createModel(%s.class)", injection._variable_name,
 					                  injection._variable.asType());
@@ -1463,7 +1473,7 @@ public class AnnotationProcessor extends AbstractProcessor {
                            "@param source The source of models to store", target)
                    .beginMethod("void", "storeModels", EnumSet.of(PUBLIC, STATIC),
                            newArrayList(JavaWriter.type(SegueController.class), "segue_controller",
-                           processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "source"),
+                           ((TypeElement) target).getQualifiedName() + "", "source"),
                            newArrayList(JavaWriter.type(IOException.class)));
         for (ModelInjectionData injection : injections)
             java_writer.emitStatement("segue_controller.store(source.%s)", injection._variable_name);
@@ -1484,13 +1494,14 @@ public class AnnotationProcessor extends AbstractProcessor {
 		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
-		        		        "@param int display The current display state\n" +
-		        		        "@param target The target of the injection", target)
-		           .beginMethod("void", "attachPresentationFragment", 
-		        		        EnumSet.of(PUBLIC, STATIC),
-		        		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
-		        		        JavaWriter.type(Object.class), "presentation_fragment",
-		        		        JavaWriter.type(String.class), "tag");
+                           "@param target The target of the injection\n" +
+                           "@param presentation_fragment The presentation fragment to inject\n" +
+                           "@param tag The tag that labels the presentation fragment", target)
+		           .beginMethod("void", "attachPresentationFragment",
+                           EnumSet.of(PUBLIC, STATIC),
+                           processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
+                           JavaWriter.type(Object.class), "presentation_fragment",
+                           JavaWriter.type(String.class), "tag");
 		final String control_format = "%s (presentation_fragment instanceof %s &&%n" +
 		        		              "\ttag.equals(\"%s\"))";
 		if (!injections.isEmpty()) {
@@ -1529,7 +1540,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
 		                        "@param finder The finder that specifies how to retrieve the context\n" +
-		        		        "@param int display The current display state\n" +
+		        		        "@param display The current display state\n" +
 		        		        "@param target The target of the injection", target)
 		           .beginMethod("void", "injectPresentationFragments", 
 		        		        EnumSet.of(PUBLIC, STATIC),
@@ -1580,7 +1591,7 @@ public class AnnotationProcessor extends AbstractProcessor {
                 .emitJavadoc("<p>Injects the Presentation into {@link %s}.</p>\n" +
                         "@param target The target of the injection\n" +
                         "@param presentation The presentation to inject", target)
-                .beginMethod("void", "injectPresentation",
+                .beginMethod("void", "attachPresentation",
                         EnumSet.of(PUBLIC, STATIC),
                         processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
                         JavaWriter.type(Object.class), "presentation");
@@ -1704,7 +1715,19 @@ public class AnnotationProcessor extends AbstractProcessor {
 		private final List<? extends VariableElement> _parameters;
 		private final String _variable_name;
         private final boolean _should_serialize;
-		
+
+        /**
+         * <p>
+         * Constructs a {@link ModelData}.
+         * <p>
+         *
+         * @param model The @Model
+         * @param should_serialize Indicates if serialization logic should be implemented for the model
+         */
+        public ModelData(@Nonnull Element model, boolean should_serialize) {
+            this(model, null, null, should_serialize);
+        }
+
 		/**
 		 * <p>
 		 * Constructs a {@link ModelData}.
@@ -1712,6 +1735,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 		 * 
 		 * @param model The @Model
 		 * @param model_implementation The implementation of the @Model
+         * @param parameters Parameters of the model implementation's constructor (list of models on which it depends)
+         * @param should_serialize Indicates if serialization logic should be implemented for the model
 		 */
 		public ModelData(@Nonnull Element model, Element model_implementation, List<? extends VariableElement> parameters
                        , boolean should_serialize) {
@@ -1721,7 +1746,21 @@ public class AnnotationProcessor extends AbstractProcessor {
 			_variable_name = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, model.getSimpleName() + "");
             _should_serialize = should_serialize;
 		}
-	}
+
+        @Override
+        public int hashCode() {
+            return _interface.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (!(object instanceof ModelData)) return false;
+            final ModelData other = (ModelData) object;
+            return _interface.equals(other._interface)
+                && (_implementation == null || other._implementation == null
+                 || _implementation.equals(other._implementation));
+        }
+    }
 	
 	/**
 	 * <p>Container for Presentation Fragment data.</p>

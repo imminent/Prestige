@@ -1,7 +1,5 @@
 package com.imminentmeals.prestige.example.controllers.implementations;
 
-import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
-
 import com.imminentmeals.prestige.annotations.ControllerImplementation;
 import com.imminentmeals.prestige.annotations.InjectModel;
 import com.imminentmeals.prestige.annotations.InjectPresentation;
@@ -16,7 +14,7 @@ import com.squareup.otto.Subscribe;
  *
  * @author Dandre Allison
  */
-@ControllerImplementation(PRODUCTION)
+@ControllerImplementation
 /* package */class _NewsReaderController implements NewsReaderController, Messages.NewsReaderPresentation {
 	@InjectModel /* package */NewsSource news_source;
 	@InjectPresentation /* package */NewsReaderPresentation presentation;

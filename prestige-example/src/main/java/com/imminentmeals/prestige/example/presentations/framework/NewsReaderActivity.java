@@ -1,6 +1,5 @@
 package com.imminentmeals.prestige.example.presentations.framework;
 
-import static com.imminentmeals.prestige.example.presentations.framework.PresentationUtilities.KEY;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -10,7 +9,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import butterknife.InjectView;
 
 import com.imminentmeals.prestige.Prestige;
 import com.imminentmeals.prestige.annotations.InjectDataSource;
@@ -26,6 +24,10 @@ import com.imminentmeals.prestige.example.presentations.Messages.NewsReaderPrese
 import com.imminentmeals.prestige.example.presentations.Messages.NewsReaderPresentation.WillStartPresentation;
 import com.imminentmeals.prestige.example.presentations.NewsReaderPresentation;
 import com.imminentmeals.prestige.example.presentations.protocols.NewsReaderProtocol;
+
+import butterknife.InjectView;
+
+import static com.imminentmeals.prestige.example.presentations.framework.PresentationUtilities.KEY;
 
 /**
  * Main activity: shows headlines list and articles, if layout permits.
@@ -62,7 +64,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 		
 		final boolean is_dual_pane = article != null && article.getVisibility() == View.VISIBLE;
 		final int category_index = icicle == null ? 0 : icicle.getInt(_KEY_CATEGORY_INDEX, 0);
-		Prestige.sendMessage(this, new WillCreatePresentation(is_dual_pane, category_index));
+		Prestige.sendMessage(new WillCreatePresentation(is_dual_pane, category_index));
 		
 		// Sets up Headlines
 	    _headlines_fragment.setSelectable(is_dual_pane);
@@ -72,7 +74,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 	@Override
 	protected void onStart() {
 		super.onStart();
-		Prestige.sendMessage(this, WillStartPresentation.DID_START);
+		Prestige.sendMessage(WillStartPresentation.DID_START);
 	}
 
 /* Activity Callbacks */
@@ -131,7 +133,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 			.setTitle("Select a Category")
 			.setItems(categories, new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int which) {
-						Prestige.sendMessage(NewsReaderActivity.this, new CategorySelected(which));
+						Prestige.sendMessage(new CategorySelected(which));
 					}
 			})
 			.create()
@@ -141,7 +143,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 /* NewsReaderNavigationCallback */
 	@Override
 	public void onCategorySelected(int category_index) {
-		Prestige.sendMessage(this, new CategorySelected(category_index));
+		Prestige.sendMessage(new CategorySelected(category_index));
 	}
 	
 /* Helpers */
@@ -150,7 +152,7 @@ public class NewsReaderActivity extends Activity implements NewsReaderPresentati
 	    if (icicle != null) {
 	      final int category_index = icicle.getInt(_KEY_CATEGORY_INDEX, 0);
 	      final int article_index = icicle.getInt(_KEY_ARTICLE_INDEX, -1);
-	      Prestige.sendMessage(this, new WillRestorePresentation(category_index, article_index));
+	      Prestige.sendMessage(new WillRestorePresentation(category_index, article_index));
 	    }
 	  }
 

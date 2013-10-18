@@ -13,7 +13,7 @@
 
 	<groupId>com.imminentmeals</groupId>
 	<artifactId>prestige-parent</artifactId>
-	<version>0.6-SNAPSHOT</version>
+	<version>0.7-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Prestige (Parent)</name>
@@ -40,13 +40,13 @@
 		<butterknife.version>2.0.1</butterknife.version>
 		<guava.version>15.0</guava.version>
 		<java-writer.version>2.1.2</java-writer.version>
-		<findbugs.version>2.0.1</findbugs.version>
+		<findbugs.version>2.0.2</findbugs.version>
 
 		<!-- Testing -->
 		<junit.version>4.10</junit.version>
 		<fest.version>2.0M10</fest.version>
 		<fest.android.version>1.0.3</fest.android.version>
-		<robolectric.version>2.1.1</robolectric.version>
+		<robolectric.version>2.2</robolectric.version>
         <compile-test.version>0.3</compile-test.version>
 
 		<!-- Plugins -->

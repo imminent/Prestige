@@ -25,8 +25,7 @@ import android.app.FragmentTransaction;
  *
  * This class implements an adapter that facilitates handling of action bar navigation events.
  * An instance of this class must be installed as a TabListener or OnNavigationListener on an
- * Action Bar, and it will relay the navigation events to a configured listener
- * (a {@link sans.newsreader.ui.CompatActionBarNavListener}).
+ * Action Bar, and it will relay the navigation events to a configured listener.
  */
 public class ActionBarNavigationObserver implements TabListener, OnNavigationListener {
 

@@ -33,8 +33,11 @@ public final class Prestige {
 	 * @param activity The target of the injection
 	 */
 	public static void conjureController(@Nonnull Activity activity) {
+        if (_segue_controller == null)
+            throw new IllegalStateException("Attempting to create controller before Segue Controller was created " +
+                    "(Prestige.conjureSegueController(String)).");
 		// Creates Controller
-		Finder.ACTIVITY.findSegueControllerApplication(activity).segueController().createController(activity);
+        _segue_controller.createController(activity);
 		injectDataSource(Finder.ACTIVITY, activity);
 	}
 	
@@ -57,24 +60,6 @@ public final class Prestige {
 	
 	/**
 	 * <p>Sends the given message on the Controller Bus.</p>
-	 * @param activity The Activity that sent the message
-	 * @param message The message to send
-	 */
-	public static void sendMessage(@Nonnull Activity activity, @Nonnull Object message) {
-		Finder.ACTIVITY.findSegueControllerApplication(activity).segueController().sendMessage(message);
-	}
-	
-	/**
-	 * <p>Sends the given message on the Controller Bus.</p>
-	 * @param fragment The Fragment that sent the message
-	 * @param message The message to send
-	 */
-	public static void sendMessage(@Nonnull Fragment fragment, @Nonnull Object message) {
-		Finder.FRAGMENT.findSegueControllerApplication(fragment).segueController().sendMessage(message);
-	}
-	
-	/**
-	 * <p>Sends the given message on the Controller Bus.</p>
 	 * @param message The message to send
 	 */
 	public static void sendMessage(@Nonnull Object message) {
@@ -90,11 +75,10 @@ public final class Prestige {
 	 * @param scope The implementation scope
 	 * @return The Segue Controller
 	 */
-	public static SegueController conjureSegueController(@Nonnull String scope) {	
+	public static void conjureSegueController(@Nonnull String scope) {
 		try {
 			final Class<?> segue_controller = Class.forName("com.imminentmeals.prestige._SegueController");
 			_segue_controller = (SegueController) segue_controller.getConstructor(String.class).newInstance(scope);
-			return _segue_controller;
 		} catch (IllegalArgumentException exception) {
             logProblemWithSetup(exception);
 		} catch (SecurityException exception) {
@@ -110,7 +94,6 @@ public final class Prestige {
         } catch (ClassNotFoundException exception) {
 			Log.e(_TAG, "Generated _SegueController cannot be found", exception);
 		}
-		return null;
 	}
 
     /**
@@ -118,15 +101,24 @@ public final class Prestige {
 	 * @param activity The given Activity
 	 */
 	public static void vanishController(@Nonnull Activity activity) {
-		Finder.ACTIVITY.findSegueControllerApplication(activity).segueController().didDestroyActivity(activity);
+        if (_segue_controller == null)
+            throw new IllegalStateException("Attempting to destroy controller before Segue Controller was created " +
+                    "(Prestige.conjureSegueController(String)).");
+		_segue_controller.didDestroyActivity(activity);
 	}
 	
 	public static void registerForControllerBus(@Nonnull Activity activity) {
-		Finder.ACTIVITY.findSegueControllerApplication(activity).segueController().registerForControllerBus(activity);
+        if (_segue_controller == null)
+            throw new IllegalStateException("Attempting to register controller before Segue Controller was created " +
+                    "(Prestige.conjureSegueController(String)).");
+		_segue_controller.registerForControllerBus(activity);
 	}
 	
 	public static void unregisterForControllerBus(@Nonnull Activity activity) {
-		Finder.ACTIVITY.findSegueControllerApplication(activity).segueController().unregisterForControllerBus(activity);
+        if (_segue_controller == null)
+            throw new IllegalStateException("Attempting to unregister controller before Segue Controller was created " +
+                    "(Prestige.conjureSegueController(String)).");
+		_segue_controller.unregisterForControllerBus(activity);
 	}
 	
 	/**
@@ -178,23 +170,9 @@ public final class Prestige {
 	 * @return
 	 */
     @TargetApi(ICE_CREAM_SANDWICH)
-	public static <T extends Application & SegueControllerApplication> SegueController materialize(@Nonnull T application
-                                                                                                 , @Nonnull String scope) {
+	public static void materialize(@Nonnull Application application, @Nonnull String scope) {
 		application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks());
-		return conjureSegueController(scope);
-	}
-	
-	/**
-	 * <p>Retrieves the Model Implementation for the given Model.</p>
-	 * @param model_interface The given Model
-	 * @return The implementation of the given Model
-	 */
-    @SuppressWarnings("unused")
-	public static <T> T getModel(Class<T> model_interface) {
-		if (_segue_controller == null)
-			throw new IllegalStateException("Attempting to get Model before Segue Controller was created " +
-					"(Prestige.conjureSegueController(String)).");
-		return _segue_controller.createModel(model_interface);
+		conjureSegueController(scope);
 	}
 	
 	/**
@@ -214,7 +192,7 @@ public final class Prestige {
 		_segue_controller.attachPresentationFragment(activity, fragment, fragment.getTag());
 	}
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "UnusedDeclaration"})
     public static <T> void store(@Nonnull T source) throws IOException {
         final Class<?> source_class = source.getClass();
         try {
@@ -229,12 +207,35 @@ public final class Prestige {
             if (inject != null)
                 inject.invoke(null, _segue_controller, source);
         } catch (ClassNotFoundException _) {
-            // Allows injectModels to be called on targets without injected Models
+            // Allows store to be called on targets without injected Models
             _MODEL_STORERS.put(source_class, _NO_OP);
         } catch (InvocationTargetException exception) {
             throw new UnableToStoreException("Unable to store Models for " + source, exception.getTargetException());
         } catch (Exception exception) {
             throw new UnableToStoreException("Unable to store Models for " + source, exception);
+        }
+    }
+
+    public static void injectModels(@Nonnull Object target) {
+        final Class<?> target_class = target.getClass();
+        try {
+            final Method inject;
+            if (!_MODEL_INJECTORS.containsKey(target_class)) {
+                final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.MODEL_INJECTOR_SUFFIX);
+                inject = injector.getMethod("injectModels", SegueController.class, target_class);
+                _MODEL_INJECTORS.put(target_class, inject);
+            } else
+                inject = _MODEL_INJECTORS.get(target_class);
+            // Allows for no-ops when there's nothing to inject
+            if (inject != null)
+                inject.invoke(null, _segue_controller, target);
+        } catch (ClassNotFoundException _) {
+            // Allows injectModels to be called on targets without injected Models
+            _MODEL_INJECTORS.put(target_class, _NO_OP);
+        } catch (InvocationTargetException exception) {
+            throw new UnableToInjectException("Unable to inject Models for " + target, exception.getTargetException());
+        } catch (Exception exception) {
+            throw new UnableToInjectException("Unable to inject Models for " + target, exception);
         }
     }
 	
@@ -273,29 +274,6 @@ public final class Prestige {
     }
 
 /* Helpers */
-	/* package */static void injectModels(@Nonnull SegueController segue_controller, @Nonnull Object target) {
-		final Class<?> target_class = target.getClass();
-		try {
-			final Method inject;
-			if (!_MODEL_INJECTORS.containsKey(target_class)) {
-				final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.MODEL_INJECTOR_SUFFIX);
-				inject = injector.getMethod("injectModels", SegueController.class, target_class);
-				_MODEL_INJECTORS.put(target_class, inject);
-			} else
-				inject = _MODEL_INJECTORS.get(target_class);
-			// Allows for no-ops when there's nothing to inject
-			if (inject != null)
-				inject.invoke(null, segue_controller, target);
-		} catch (ClassNotFoundException _) {
-			// Allows injectModels to be called on targets without injected Models
-			_MODEL_INJECTORS.put(target_class, _NO_OP);
-		} catch (InvocationTargetException exception) {
-			throw new UnableToInjectException("Unable to inject Models for " + target, exception.getTargetException());
-		} catch (Exception exception) {
-			throw new UnableToInjectException("Unable to inject Models for " + target, exception);
-		}
-	}
-	
 	/**
 	 * <p>Injects a Data Source into the given target.</p>
 	 * @param finder The finder that specifies how to retrieve the Segue Controller from the target
@@ -307,13 +285,13 @@ public final class Prestige {
 			final Method inject;
 			if (!_DATA_SOURCE_INJECTORS.containsKey(target_class)) {
 				final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.DATA_SOURCE_INJECTOR_SUFFIX);
-				inject = injector.getMethod("injectDataSource", Finder.class, target_class);
+				inject = injector.getMethod("injectDataSource", SegueController.class, Finder.class, target_class);
 				_DATA_SOURCE_INJECTORS.put(target_class, inject);
 			} else
 				inject = _DATA_SOURCE_INJECTORS.get(target_class);
 			// Allows for no-ops when there's nothing to inject
 			if (inject != null)
-				inject.invoke(null, finder, target);
+				inject.invoke(null, _segue_controller, finder, target);
 		} catch (ClassNotFoundException _) {
 			// Allows injectDataSource to be called on targets without a data source
 			_DATA_SOURCE_INJECTORS.put(target_class, _NO_OP);
@@ -328,13 +306,13 @@ public final class Prestige {
      * <p>Injects a Presentation into the given target.</p>
      * @param target The target of the injection
      */
-    /* package */static void injectPresentation(@Nonnull Object target, @Nonnull Object presentation) {
+    /* package */static void attachPresentation(@Nonnull Object target, @Nonnull Object presentation) {
         final Class<?> target_class = target.getClass();
         try {
             final Method inject;
             if (!_PRESENTATION_INJECTORS.containsKey(target_class)) {
                 final Class<?> injector = Class.forName(target_class.getName() + AnnotationProcessor.PRESENTATION_INJECTOR_SUFFIX);
-                inject = injector.getMethod("injectPresentation", target_class, Object.class);
+                inject = injector.getMethod("attachPresentation", target_class, Object.class);
                 _PRESENTATION_INJECTORS.put(target_class, inject);
             } else
                 inject = _PRESENTATION_INJECTORS.get(target_class);
@@ -342,7 +320,7 @@ public final class Prestige {
             if (inject != null)
                 inject.invoke(null, target, presentation);
         } catch (ClassNotFoundException _) {
-            // Allows injectPresentation to be called on targets without a presentation field
+            // Allows attachPresentation to be called on targets without a presentation field
             _PRESENTATION_INJECTORS.put(target_class, _NO_OP);
         } catch (RuntimeException exception) {
             throw exception;
@@ -408,6 +386,7 @@ public final class Prestige {
 	}
 
 /* Private Helpers */
+    // TODO: delegate logging outside of library
     private static void logProblemWithSetup(Exception exception) {
         Log.e(_TAG, "Problem with Prestige setup", exception);
     }
