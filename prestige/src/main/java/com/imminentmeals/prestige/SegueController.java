@@ -4,6 +4,10 @@ import android.app.Activity;
 
 import java.io.IOException;
 
+import javax.annotation.Nonnull;
+
+import timber.log.Timber;
+
 /**
  *
  * @author Dandre Allison
@@ -27,4 +31,6 @@ public interface SegueController {
 	void unregisterForControllerBus(Activity activity);
 
     <T> void store(T object) throws IOException;
+
+    @Nonnull Timber timber();
 }

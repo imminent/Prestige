@@ -6,7 +6,6 @@ import android.app.Application;
 import android.app.Application.ActivityLifecycleCallbacks;
 import android.app.Fragment;
 import android.os.Bundle;
-import android.util.Log;
 
 import com.imminentmeals.prestige.codegen.AnnotationProcessor;
 import com.imminentmeals.prestige.codegen.Finder;
@@ -16,7 +15,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 
-import javax.annotation.Nonnull;
+import javax.annotation.ParametersAreNonnullByDefault;
+
+import timber.log.Timber;
 
 import static android.os.Build.VERSION_CODES.HONEYCOMB;
 import static android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH;
@@ -26,13 +27,14 @@ import static com.google.common.collect.Maps.newHashMap;
  * TODO: can I use interfaces to make this generally applicable to Java while working in an Android environment?
  * @author Dandre Allison
  */
+@ParametersAreNonnullByDefault
 public final class Prestige {
 	
 	/**
 	 * <p>Injects a Data Source into the given {@link Activity}.</p>
 	 * @param activity The target of the injection
 	 */
-	public static void conjureController(@Nonnull Activity activity) {
+	public static void conjureController(Activity activity) {
         if (_segue_controller == null)
             throw new IllegalStateException("Attempting to create controller before Segue Controller was created " +
                     "(Prestige.conjureSegueController(String)).");
@@ -46,7 +48,7 @@ public final class Prestige {
 	 * @param activity The given Presentation
 	 * @param display The given display
 	 */
-	public static void injectPresentationFragments(@Nonnull Activity activity, int display) {
+	public static void injectPresentationFragments(Activity activity, int display) {
 		injectPresentationFragments(Finder.ACTIVITY, display, activity);
 	}
 	
@@ -54,7 +56,7 @@ public final class Prestige {
 	 * <p>Injects a Data Source into the given {@link Fragment}.</p>
 	 * @param fragment The target of the injection
 	 */
-	public static void injectDataSource(@Nonnull Fragment fragment) {
+	public static void injectDataSource(Fragment fragment) {
 		injectDataSource(Finder.FRAGMENT, fragment);
 	}
 	
@@ -62,37 +64,51 @@ public final class Prestige {
 	 * <p>Sends the given message on the Controller Bus.</p>
 	 * @param message The message to send
 	 */
-	public static void sendMessage(@Nonnull Object message) {
+	public static void sendMessage(Object message) {
 		if (_segue_controller == null)
 			throw new IllegalStateException("Attempting to send message before Segue Controller was created " +
 					"(Prestige.conjureSegueController(String)).");
+        _segue_controller.timber().tag(_TAG).d("Sending message to controller: " + message);
 		_segue_controller.sendMessage(message);
 	}
+
+    /**
+     * <p>Creates the {@link SegueController} set for the given implementation scope. The implementation scope specifies
+     * which version of implementations to use.</p>
+     * @param scope The implementation scope
+     * @return The Segue Controller
+     */
+    public static void conjureSegueController(String scope) {
+        conjureSegueController(scope, Timber.PROD);
+    }
 	  
 	/**
 	 * <p>Creates the {@link SegueController} set for the given implementation scope. The implementation scope specifies
 	 * which version of implementations to use.</p>
 	 * @param scope The implementation scope
+     * @param log The log where messages are written
 	 * @return The Segue Controller
 	 */
-	public static void conjureSegueController(@Nonnull String scope) {
+	public static void conjureSegueController(String scope, Timber log) {
 		try {
 			final Class<?> segue_controller = Class.forName("com.imminentmeals.prestige._SegueController");
-			_segue_controller = (SegueController) segue_controller.getConstructor(String.class).newInstance(scope);
+			_segue_controller = (SegueController) segue_controller.getConstructor(String.class, Timber.class)
+                                                                  .newInstance(scope, log);
 		} catch (IllegalArgumentException exception) {
-            logProblemWithSetup(exception);
+            logProblemWithSetup(exception, log);
 		} catch (SecurityException exception) {
-            logProblemWithSetup(exception);
+            logProblemWithSetup(exception, log);
 		} catch (InstantiationException exception) {
-            logProblemWithSetup(exception);
+            logProblemWithSetup(exception, log);
 		} catch (IllegalAccessException exception) {
-            logProblemWithSetup(exception);
+            logProblemWithSetup(exception, log);
 		} catch (InvocationTargetException exception) {
-            logProblemWithSetup(exception);
+            logProblemWithSetup(exception, log);
 		} catch (NoSuchMethodException exception) {
-            logProblemWithSetup(exception);
+            logProblemWithSetup(exception, log);
         } catch (ClassNotFoundException exception) {
-			Log.e(_TAG, "Generated _SegueController cannot be found", exception);
+            log.tag(_TAG).e(exception, "Generated _SegueController cannot be found. Was Prestige annotation processor "
+                                     + "executed? Was it removed by ProGuard?");
 		}
 	}
 
@@ -100,21 +116,21 @@ public final class Prestige {
 	 * <p>Destroys the constructed Controller for the given {@link Activity}.</p>
 	 * @param activity The given Activity
 	 */
-	public static void vanishController(@Nonnull Activity activity) {
+	public static void vanishController(Activity activity) {
         if (_segue_controller == null)
             throw new IllegalStateException("Attempting to destroy controller before Segue Controller was created " +
                     "(Prestige.conjureSegueController(String)).");
 		_segue_controller.didDestroyActivity(activity);
 	}
 	
-	public static void registerForControllerBus(@Nonnull Activity activity) {
+	public static void registerForControllerBus(Activity activity) {
         if (_segue_controller == null)
             throw new IllegalStateException("Attempting to register controller before Segue Controller was created " +
                     "(Prestige.conjureSegueController(String)).");
 		_segue_controller.registerForControllerBus(activity);
 	}
 	
-	public static void unregisterForControllerBus(@Nonnull Activity activity) {
+	public static void unregisterForControllerBus(Activity activity) {
         if (_segue_controller == null)
             throw new IllegalStateException("Attempting to unregister controller before Segue Controller was created " +
                     "(Prestige.conjureSegueController(String)).");
@@ -165,15 +181,27 @@ public final class Prestige {
 	 * <p>Materializes Prestige for the given scope and binds it to the Activity lifecycles in the given Application. This is
 	 * equivalent to how you would use {@link #conjureSegueController(String)} and {@link Prestige#activityLifecycleCallbacks()}
 	 * in most cases.</p>
-	 * @param application
-	 * @param scope
-	 * @return
+	 * @param application The application using Prestige
+	 * @param scope The implementation scope
 	 */
     @TargetApi(ICE_CREAM_SANDWICH)
-	public static void materialize(@Nonnull Application application, @Nonnull String scope) {
-		application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks());
-		conjureSegueController(scope);
+	public static void materialize(Application application, String scope) {
+		materialize(application, scope, Timber.PROD);
 	}
+
+    /**
+     * <p>Materializes Prestige for the given scope and binds it to the Activity lifecycles in the given Application. This is
+     * equivalent to how you would use {@link #conjureSegueController(String,Timber)} and {@link Prestige#activityLifecycleCallbacks()}
+     * in most cases.</p>
+     * @param application The application using Prestige
+     * @param scope The implementation scope
+     * @param log The log where messages are written
+     */
+    @TargetApi(ICE_CREAM_SANDWICH)
+    public static void materialize(Application application, String scope, Timber log) {
+        application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks());
+        conjureSegueController(scope, log);
+    }
 	
 	/**
 	 * <p>Attaches the given Presentation Fragment to the Controller for the give Presentation.</p>
@@ -182,7 +210,7 @@ public final class Prestige {
 	 * @param fragment
 	 */
 	@TargetApi(HONEYCOMB)
-    public static void attachPresentationFragment(@Nonnull Activity activity, @Nonnull Fragment fragment) {
+    public static void attachPresentationFragment(Activity activity, Fragment fragment) {
 		if (_segue_controller == null)
 			throw new IllegalStateException("Attempting to attach Presentation Fragment before Segue Controller was created " +
 					"(Prestige.conjureSegueController(String)).");
@@ -193,7 +221,7 @@ public final class Prestige {
 	}
 
     @SuppressWarnings({"unchecked", "UnusedDeclaration"})
-    public static <T> void store(@Nonnull T source) throws IOException {
+    public static <T> void store(T source) throws IOException {
         final Class<?> source_class = source.getClass();
         try {
             final Method inject;
@@ -216,7 +244,7 @@ public final class Prestige {
         }
     }
 
-    public static void injectModels(@Nonnull Object target) {
+    public static void injectModels(Object target) {
         final Class<?> target_class = target.getClass();
         try {
             final Method inject;
@@ -279,7 +307,7 @@ public final class Prestige {
 	 * @param finder The finder that specifies how to retrieve the Segue Controller from the target
 	 * @param target The target of the injection
 	 */
-	/* package */static void injectDataSource(@Nonnull Finder finder, @Nonnull Object target) {
+	/* package */static void injectDataSource(Finder finder, Object target) {
 		final Class<?> target_class = target.getClass();
 		try {
 			final Method inject;
@@ -306,7 +334,7 @@ public final class Prestige {
      * <p>Injects a Presentation into the given target.</p>
      * @param target The target of the injection
      */
-    /* package */static void attachPresentation(@Nonnull Object target, @Nonnull Object presentation) {
+    /* package */static void attachPresentation(Object target, Object presentation) {
         final Class<?> target_class = target.getClass();
         try {
             final Method inject;
@@ -335,7 +363,7 @@ public final class Prestige {
 	 * <p>Injects a Presentation Fragment into the given target.</p>
 	 * @param target The target of the injection
 	 */
-	/* package */static void injectPresentationFragments(@Nonnull Finder finder, int display, @Nonnull Object target) {
+	/* package */static void injectPresentationFragments(Finder finder, int display, Object target) {
 		final Class<?> target_class = target.getClass();
 		try {
 			final Method inject;
@@ -360,8 +388,8 @@ public final class Prestige {
 		}
 	}
 	
-	/* package */static void attachPresentationFragment(@Nonnull Object target, @Nonnull Object presentation_fragment, 
-			@Nonnull String tag) {
+	/* package */static void attachPresentationFragment(Object target, Object presentation_fragment, 
+			String tag) {
 		final Class<?> target_class = target.getClass();
 		try {
 			final Method attach;
@@ -386,9 +414,8 @@ public final class Prestige {
 	}
 
 /* Private Helpers */
-    // TODO: delegate logging outside of library
-    private static void logProblemWithSetup(Exception exception) {
-        Log.e(_TAG, "Problem with Prestige setup", exception);
+    private static void logProblemWithSetup(Exception exception, Timber log) {
+        log.tag(_TAG).e(exception, "Problem with Prestige setup");
     }
 	
 /* Private Constructor */
@@ -409,6 +436,6 @@ public final class Prestige {
 	private static final Map<Class<?>, Method> _ATTACHERS = newHashMap(); 
 	/** Empty method */
 	private static final Method _NO_OP = null;
-    private static final String _TAG = "Prestige";
+    /* package */static final String _TAG = "Prestige";
 	private static SegueController _segue_controller;
 }

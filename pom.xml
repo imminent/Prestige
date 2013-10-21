@@ -41,6 +41,7 @@
 		<guava.version>15.0</guava.version>
 		<java-writer.version>2.1.2</java-writer.version>
 		<findbugs.version>2.0.2</findbugs.version>
+        <timber.version>1.1.0</timber.version>
 
 		<!-- Testing -->
 		<junit.version>4.10</junit.version>
@@ -92,6 +93,12 @@
 				<artifactId>butterknife</artifactId>
 				<version>${butterknife.version}</version>
 			</dependency>
+            <!-- Timber: injection friendly logging API -->
+            <dependency>
+                <groupId>com.jakewharton.timber</groupId>
+                <artifactId>timber</artifactId>
+                <version>${timber.version}</version>
+            </dependency>
 			<!-- Dagger: Compile-time Java dependency injection -->
 			<dependency>
 				<groupId>com.squareup.dagger</groupId>

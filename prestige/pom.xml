@@ -50,6 +50,11 @@
 			<groupId>com.squareup</groupId>
 			<artifactId>otto</artifactId>
 		</dependency>
+        <!-- Timber: injection friendly logging API -->
+        <dependency>
+            <groupId>com.jakewharton.timber</groupId>
+            <artifactId>timber</artifactId>
+        </dependency>
 		<!-- JavaWriter: Java source code generation utilities -->
 		<dependency>
 		  <groupId>com.squareup</groupId>

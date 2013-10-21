@@ -18,6 +18,7 @@ import com.google.common.collect.Maps.EntryTransformer;
 import com.google.common.io.Closeables;
 import com.imminentmeals.prestige.ControllerContract;
 import com.imminentmeals.prestige.GsonProvider;
+import com.imminentmeals.prestige.Prestige;
 import com.imminentmeals.prestige.SegueController;
 import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Controller.Default;
@@ -76,6 +77,7 @@ import javax.tools.JavaFileObject;
 import dagger.Lazy;
 import dagger.Module;
 import dagger.Provides;
+import timber.log.Timber;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
@@ -1069,16 +1071,17 @@ public class AnnotationProcessor extends AbstractProcessor {
                            JavaWriter.type(GsonConverter.class),
                            JavaWriter.type(GsonProvider.class),
                            JavaWriter.type(IOException.class))
-					.emitEmptyLine()
-					.emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
-                                 "for the current Presentation, and communicating with the Controller Bus.</p>")
-				    .beginType("com.imminentmeals.prestige._SegueController", "class", public_modifier, null,
-                               // implements
-                               "com.imminentmeals.prestige.SegueController")
-				    .emitJavadoc("Bus over which Presentations communicate to their Controllers")
-				    .emitAnnotation(Inject.class)
-				    .emitAnnotation(Named.class, ControllerContract.BUS)
-				    .emitField("com.squareup.otto.Bus", "controller_bus");
+                   .emitStaticImports(JavaWriter.type(Prestige.class) + "._TAG")
+				   .emitEmptyLine()
+				   .emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
+                                "for the current Presentation, and communicating with the Controller Bus.</p>")
+				   .beginType("com.imminentmeals.prestige._SegueController", "class", public_modifier, null,
+                              // implements
+                              "com.imminentmeals.prestige.SegueController")
+				   .emitJavadoc("Bus over which Presentations communicate to their Controllers")
+				   .emitAnnotation(Inject.class)
+				   .emitAnnotation(Named.class, ControllerContract.BUS)
+				   .emitField("com.squareup.otto.Bus", "controller_bus");
 		final StringBuilder controller_puts = new StringBuilder();
 		for (PresentationControllerBinding binding : controllers) {
 			java_writer.emitJavadoc("Provider for instances of the {@link %s} Controller", binding._controller)
@@ -1106,7 +1109,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 		java_writer.emitEmptyLine()
 		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
 		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier,
-		        		        "java.lang.String", "scope")
+		        		        "java.lang.String", "scope",
+                                JavaWriter.type(Timber.class), "log")
+                   .emitStatement("_log = log")
 		           .emitStatement("final List<Object> modules = new ArrayList<Object>()")
 		           .emitSingleLineComment("Controller modules");
         final String else_if = "else if";
@@ -1131,11 +1136,11 @@ public class AnnotationProcessor extends AbstractProcessor {
             String production_module = null;
 			for (ModuleData model_module : model_modules)
 				if (model_module._scope.equals(Implementations.PRODUCTION)) {
-					production_module = String.format(Locale.US, "modules.add(new %s())", model_module._qualified_name);
+					production_module = String.format(Locale.US, "modules.add(new %s(_log))", model_module._qualified_name);
 				} else {
                     java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
                                                              , if_else_if_control, model_module._scope))
-                               .emitStatement("modules.add(new %s())", model_module._qualified_name)
+                               .emitStatement("modules.add(new %s(_log))", model_module._qualified_name)
                                .endControlFlow();
                     if_else_if_control = else_if;
                 }
@@ -1156,6 +1161,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitAnnotation(SuppressWarnings.class, JavaWriter.stringLiteral("unchecked"))
 				   .emitAnnotation(Override.class)
 				   .beginMethod("<T> T", "dataSource", public_modifier, "Class<?>", "target")
+                   .emitStatement("_log.tag(_TAG).d(\"Injecting \" + _controllers.get(target) + \" into \" + target)")
 				   .emitStatement("return (T) _controllers.get(target)")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -1182,6 +1188,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
+                   .emitStatement("_log.tag(_TAG).d(\"Vanishing \" + _controllers.get(activity_class) +"
+                                + " \"(for \" + activity + \")\")")
 				   .emitStatement("_controllers.remove(activity_class)")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -1198,6 +1206,8 @@ public class AnnotationProcessor extends AbstractProcessor {
                                 JavaWriter.type(String.class), "tag")
 				   .emitStatement("final Object controller = _controllers.get(activity.getClass())")
 				   .beginControlFlow("if (controller != null)")
+                   .emitStatement("_log.tag(_TAG).d(\"Attaching \" + presentation_fragment + \" to \" + "
+                                + "controller +\"(for \" + activity + \")\")")
 				   .emitStatement("Prestige.attachPresentationFragment(controller, presentation_fragment, tag)")
 				   .endControlFlow()
 				   .endMethod()
@@ -1208,6 +1218,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
+                   .emitStatement("_log.tag(_TAG).d(\"Registering \" + _controllers.get(activity_class) +"
+                                + " \"to receive messages (for \" + activity + \")\")")
 				   .emitStatement("controller_bus.register(_controllers.get(activity_class))")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -1217,17 +1229,26 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
+                   .emitStatement("_log.tag(_TAG).d(\"Unregistering \" + _controllers.get(activity_class) +"
+                               + " \"to receive messages (for \" + activity + \")\")")
 				   .emitStatement("controller_bus.unregister(_controllers.get(activity_class))")
 				   .endMethod()
 				   .emitEmptyLine()
                    .emitAnnotation(Override.class)
+                   .beginMethod(JavaWriter.type(Timber.class), "timber", public_modifier)
+                   .emitStatement("return _log")
+                   .endMethod()
+                   .emitEmptyLine()
+                   .emitAnnotation(Override.class)
                    .beginMethod("<T> void", "store", public_modifier, newArrayList("T", "object")
-                           , newArrayList(JavaWriter.type(IOException.class)));
+                           , newArrayList(JavaWriter.type(IOException.class)))
+                   .emitStatement("_log.tag(_TAG).d(\"Storing \" + object)");
         if_else_if_control = "if";
         for (ModelData model : models) {
             if (!model._should_serialize) continue;
 
             java_writer.beginControlFlow(String.format("%s (object instanceof %s)", if_else_if_control, model._interface))
+                       .emitStatement("_log.tag(_TAG).d(\"\\tStoring \" + object)")
                        .emitStatement("%s.get().toStream((%s) object, gson_provider.get().outputStreamFor(%s.class))"
                                     , model._variable_name + _CONVERTOR, model._interface, model._interface)
                        .endControlFlow();
@@ -1236,6 +1257,8 @@ public class AnnotationProcessor extends AbstractProcessor {
         java_writer.endMethod()
                    .emitEmptyLine()
 				   // Private fields
+                   .emitJavadoc("Log where messages are written")
+                   .emitField(JavaWriter.type(Timber.class), "_log", private_final)
 				   .emitJavadoc("Dependency injection object graph")
 				   .emitField("ObjectGraph", "_object_graph", private_final)
 				   .emitJavadoc("Provides the Controller implementation for the given Presentation Implementation")
@@ -1361,15 +1384,15 @@ public class AnnotationProcessor extends AbstractProcessor {
                                 JavaWriter.type(File.class),
                                 JavaWriter.type(FileInputStream.class),
                                 JavaWriter.type(FileNotFoundException.class))
-					.emitEmptyLine();
+				   .emitEmptyLine();
 		final StringBuilder model_list = new StringBuilder();
 		for (ModelData model : models) {
 			model_list.append("<li>{@link ").append(model._interface).append("}</li>\n");
 		}
 		java_writer.emitJavadoc("<p>Module for injecting:\n" +
-                "<ul>\n" +
-                "%s" +
-                "</ul></p>", model_list)
+                                "<ul>\n" +
+                                "%s" +
+                                "</ul></p>", model_list)
 				   .emitAnnotation(Module.class, ImmutableMap.of(
                            "injects",
                            "{\n" +
@@ -1378,8 +1401,11 @@ public class AnnotationProcessor extends AbstractProcessor {
                            "overrides", !class_name.equals(_DEFAULT_MODEL_MODULE),
                            "library", true,
                            "complete", false))
-					.beginType(class_name, "class", EnumSet.of(PUBLIC))
-					.emitEmptyLine();
+				   .beginType(class_name, "class", EnumSet.of(PUBLIC))
+				   .emitEmptyLine()
+                   .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log")
+                   .emitStatement("_log = log")
+                   .endMethod();
 		// Model providers
 		for (ModelData model : models) {
             java_writer.emitEmptyLine()
@@ -1416,7 +1442,9 @@ public class AnnotationProcessor extends AbstractProcessor {
             if (model._should_serialize) {
                 java_writer.emitStatement("final File file = gson_provider.fileFor(" + model._implementation + ".class)")
                            .beginControlFlow("try")
-                           .emitStatement("return file.exists()? converter.from(new FileInputStream(file)) : new %s(%s)"
+                           .emitStatement("_log.tag(_TAG).d(file.exists() ? \"Restoring %s from file\" "
+                                        + ": \"Creating model %s\")", model._implementation, model._interface)
+                        .emitStatement("return file.exists()? converter.from(new FileInputStream(file)) : new %s(%s)"
                                         , new_instance_format_parameters)
                            .nextControlFlow("catch (FileNotFoundException _)")
                            .emitStatement("return new %s(%s)", new_instance_format_parameters)
@@ -1439,7 +1467,10 @@ public class AnnotationProcessor extends AbstractProcessor {
                            .endMethod();
             }
         }
-		java_writer.endType();
+		java_writer.emitJavadoc("Log where messages are written")
+                   .emitField(JavaWriter.type(Timber.class), "_log", EnumSet.of(PRIVATE, FINAL))
+                   .emitField(JavaWriter.type(String.class), "_TAG", EnumSet.of(PRIVATE, STATIC, FINAL), "\"Prestige\"")
+                   .endType();
 		java_writer.close();
 	}
 	
