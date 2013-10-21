@@ -1235,6 +1235,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .endMethod()
 				   .emitEmptyLine()
                    .emitAnnotation(Override.class)
+                   .emitAnnotation(Nonnull.class)
                    .beginMethod(JavaWriter.type(Timber.class), "timber", public_modifier)
                    .emitStatement("return _log")
                    .endMethod()
