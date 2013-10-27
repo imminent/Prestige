@@ -9,31 +9,31 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
-import java.nio.charset.Charset;
+
+import static com.google.common.base.Charsets.UTF_8;
 
 /**
  * Converter which uses GSON to serialize instances of class T to disk.
  */
 public class GsonConverter<T> {
 
-    public <V extends T> GsonConverter(Gson gson, Class<V> type) {
+    public GsonConverter(Gson gson, Class<T> type) {
         _gson = gson;
         _type = type;
     }
 
-    @SuppressWarnings("unchecked")
-    public <V extends T> V from(InputStream in) {
-        final Reader reader = new InputStreamReader(in, _UTF8);
-        return (V) _gson.fromJson(reader, _type);
+    public T from(InputStream in) {
+        final Reader reader = new InputStreamReader(in, UTF_8);
+        return _gson.fromJson(reader, _type);
     }
 
-    public <V extends T> void toStream(V object, OutputStream out) throws IOException {
-        final Writer writer = new OutputStreamWriter(out, _UTF8);
+    public void toStream(Object object, OutputStream out) throws IOException {
+        if (!_type.isInstance(object)) return;
+        final Writer writer = new OutputStreamWriter(out, UTF_8);
         _gson.toJson(object, writer);
         writer.close();
     }
 
     private final Gson _gson;
-    private final Class<? extends T> _type;
-    private static final Charset _UTF8 = Charset.forName("UTF-8");
+    private final Class<T> _type;
 }

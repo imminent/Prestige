@@ -11,11 +11,15 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Maps.EntryTransformer;
+import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.InstanceCreator;
 import com.imminentmeals.prestige.ControllerContract;
 import com.imminentmeals.prestige.GsonProvider;
 import com.imminentmeals.prestige.Prestige;
@@ -37,11 +41,10 @@ import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.javawriter.JavaWriter;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Writer;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -80,12 +83,15 @@ import dagger.Provides;
 import timber.log.Timber;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Maps.newHashMapWithExpectedSize;
 import static com.google.common.collect.Maps.transformEntries;
 import static com.google.common.collect.Sets.newHashSet;
 import static com.google.common.collect.Sets.newLinkedHashSet;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 import static com.imminentmeals.prestige.codegen.Utilities.getAnnotation;
+import static com.squareup.javawriter.JavaWriter.stringLiteral;
 import static java.lang.Math.min;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
@@ -96,9 +102,11 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
 import static javax.tools.Diagnostic.Kind.NOTE;
+import static javax.tools.Diagnostic.Kind.WARNING;
 
 // TODO: can you mandate that a default implementation is provided for everything that has any implementation?
 // TODO: public static Strings for generated methods and classes to use in Prestige helper methods
+// TODO: generate ExclusionPolicy for Model fields to be skipped by Gson
 @SupportedAnnotationTypes({ "com.imminentmeals.prestige.annotations.Presentation",
 	                        "com.imminentmeals.prestige.annotations.PresentationImplementation",
 	                        "com.imminentmeals.prestige.annotations.InjectDataSource",
@@ -176,7 +184,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		processModelInjections(environment, model_injections, model_interfaces);
 		
 		// Reformats the gathered information to be used in data models
-		final ImmutableList.Builder<ModuleData> controller_modules = ImmutableList.<ModuleData>builder();
+		final ImmutableList.Builder<ModuleData> controller_modules = ImmutableList.builder();
 		for (Map.Entry<String, List<ControllerData>> controller_implementations : controllers.entrySet()) {
 			final Element implementation = controller_implementations.getValue().get(0)._implementation;
 			final String package_name = _element_utilities.getPackageOf(implementation).getQualifiedName() + "";
@@ -186,7 +194,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 					                              controller_implementations.getKey(),class_name, package_name,
 					                              controller_implementations.getValue()));
 		}
-		final ImmutableList.Builder<ModuleData> model_modules = ImmutableList.<ModuleData>builder();
+		final ImmutableList.Builder<ModuleData> model_modules = ImmutableList.builder();
 		for (Map.Entry<String, List<ModelData>> model_implementations : models.entrySet()) {
 			final Element implementation = model_implementations.getValue().get(0)._implementation;
 			final String package_name = _element_utilities.getPackageOf(implementation).getQualifiedName() + "";
@@ -217,10 +225,24 @@ public class AnnotationProcessor extends AbstractProcessor {
 						return ImmutableMap.copyOf(injections);
 					}
 				});
+        final ImmutableMap.Builder<Element, ModelData> element_to_model_map = ImmutableMap.builder();
+        for (ModelData model : model_interfaces) element_to_model_map.put(model._interface, model);
+        final Map<String, Map<Element, ModelData>> model_implementations = newHashMap();
+        final int number_of_scopes = models.size();
+        for (Entry<String, List<ModelData>> entry : models.entrySet()) {
+            Map<Element, ModelData> scoped_models;
+            if ((scoped_models = model_implementations.get(entry.getKey())) == null) {
+                scoped_models = newHashMapWithExpectedSize(number_of_scopes);
+                model_implementations.put(entry.getKey(), scoped_models);
+            }
+            for (ModelData implementation : entry.getValue())
+                scoped_models.put(implementation._interface, implementation);
+        }
 		
 		// Generates the code
 		generateSourceCode(presentation_controller_bindings, controller_modules.build(), data_source_injections,
-				           model_modules.build(), model_interfaces, model_injections, 
+				           model_modules.build(), model_interfaces, element_to_model_map.build(),
+                           ImmutableMap.copyOf(model_implementations), model_injections,
 				           ImmutableMap.copyOf(presentation_fragment_display_injections),
 				           ImmutableMap.copyOf(controller_presentation_fragment_injections), controller_presentation_injections);
 	     
@@ -329,7 +351,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		        
 		        // Finds Presentation Fragment injections and verifies that their Protocols are met
 		        for (Element enclosed_element : implementation_element.getEnclosedElements()) {
-		        	if (enclosed_element.getAnnotation(InjectPresentationFragment.class) != null && 
+		        	if (enclosed_element.getAnnotation(InjectPresentationFragment.class) != null &&
 		        		enclosed_element.getKind() == FIELD) {			
 		    			// Verifies that the Protocol extends all of the Presentation Fragment's Protocols
 		    			// Notice that it only checks against the Presentation Fragments that have already been processed
@@ -718,8 +740,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			}
 
             model_should_be_serialized.put(element, false);
-//			model_interfaces.add(new ModelData(element, false));
-			// Now that the @Controller annotation has been verified and its data extracted find its implementations				
+			// Now that the @Controller annotation has been verified and its data extracted find its implementations
 			// TODO: very inefficient
 			for (Element implementation_element : environment.getElementsAnnotatedWith(ModelImplementation.class)) {
 				// Makes sure to only deal with Model implementations for the current @Model
@@ -746,6 +767,10 @@ public class AnnotationProcessor extends AbstractProcessor {
 				} else
 					implementations.add(new ModelData(element, implementation_element, parameters, should_serialize));
 
+                if (!should_serialize && model_should_be_serialized.get(element))
+                    processingEnv.getMessager().printMessage(WARNING
+                                                           , String.format("Should make all implementations of %s serialized", implementation_element)
+                                                           , implementation_element);
                 if (should_serialize) model_should_be_serialized.put(element, true);
 			}
 		}
@@ -757,14 +782,9 @@ public class AnnotationProcessor extends AbstractProcessor {
 	
 	private void processModelInjections(RoundEnvironment environment, Map<Element, List<ModelInjectionData>> model_injections,
 			                            List<ModelData> models) {
-		final Set<Element> model_interfaces = ImmutableSet.copyOf(Lists.transform(models,
-                new Function<ModelData, Element>() {
+        final Map<Element, Boolean> model_interfaces = newHashMapWithExpectedSize(models.size());
+        for (ModelData model : models) model_interfaces.put(model._interface, model._should_serialize);
 
-                    @Nullable
-                    public Element apply(@Nullable ModelData model) {
-                        return model == null ? null : model._interface;
-                    }
-                }));
 		for (Element element : environment.getElementsAnnotatedWith(InjectModel.class)) {
 			// @InjectModel constructors are processed during @Model processing
 			if (element.getKind() != FIELD) continue;
@@ -793,9 +813,10 @@ public class AnnotationProcessor extends AbstractProcessor {
                 continue;
             }
 
+            final Element type_element = _type_utilities.asElement(element.asType());
 			// Verifies that the target type is a Model
 			note(element, "\tinjecting Model " + element.asType());
-			if (!model_interfaces.contains(_type_utilities.asElement(element.asType()))) {
+			if (!model_interfaces.containsKey(type_element)) {
 				error(element, "@InjectModel must be a Model (%s.%s)."
                     , enclosing_element.getQualifiedName(), element);
 				continue;
@@ -812,7 +833,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 			// Gathers the @InjectModel information
 			final String package_name = _element_utilities.getPackageOf(enclosing_element) + "";
 			final String element_class = _element_utilities.getBinaryName(enclosing_element) + "";
-			final ModelInjectionData injection = new ModelInjectionData(package_name, element, element_class);
+			final ModelInjectionData injection = new ModelInjectionData(package_name, element, element_class
+                                                                      , model_interfaces.get(type_element));
 			if (model_injections.containsKey(enclosing_element))
 				model_injections.get(enclosing_element).add(injection);
 			else
@@ -941,6 +963,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateSourceCode(List<PresentationControllerBinding> controllers, List<ModuleData> controller_modules,
 			                        List<DataSourceInjectionData> data_source_injections,
 			                        List<ModuleData> model_modules, List<ModelData> model_interfaces,
+                                    Map<Element, ModelData> element_to_model_interface,
+                                    Map<String, Map<Element, ModelData>> model_implementations,
 			                        Map<Element, List<ModelInjectionData>> model_injections,
 			                        Map<Element, Map<Integer, List<PresentationFragmentInjectionData>>> presentation_fragment_injections,
 			                        Map<Element, List<PresentationFragmentInjectionData>> controller_presentation_fragment_injections,
@@ -952,7 +976,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 			JavaFileObject source_code = filer.createSourceFile(_SEGUE_CONTROLLER_SOURCE, (Element) null);
 	        writer = source_code.openWriter();
 	        writer.flush();
-	        generateSegueControllerSourceCode(writer, controllers, controller_modules, model_modules, model_interfaces);
+	        generateSegueControllerSourceCode(writer, controllers, controller_modules, model_modules, model_interfaces
+                                            , element_to_model_interface, model_implementations);
 	        
 	        // Generates the *ControllerModules
 	        for (ModuleData controller_module : controller_modules) {
@@ -1048,11 +1073,13 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 */
 	private void generateSegueControllerSourceCode(Writer writer, List<PresentationControllerBinding> controllers,
                                                    List<ModuleData> controller_modules, List<ModuleData> model_modules,
-                                                   List<ModelData> models)
+                                                   List<ModelData> models, Map<Element, ModelData> element_to_model_interfaces,
+                                                   Map<String, Map<Element, ModelData>> model_implementations)
 			                                        		throws IOException {
 		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
 		final EnumSet<Modifier> private_final = EnumSet.of(PRIVATE, FINAL);
 		JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage("com.imminentmeals.prestige")
 		           .emitImports("java.util.HashMap",
@@ -1070,7 +1097,11 @@ public class AnnotationProcessor extends AbstractProcessor {
                            "dagger.ObjectGraph",
                            JavaWriter.type(GsonConverter.class),
                            JavaWriter.type(GsonProvider.class),
-                           JavaWriter.type(IOException.class))
+                           JavaWriter.type(IOException.class),
+                           JavaWriter.type(Gson.class),
+                           JavaWriter.type(InstanceCreator.class),
+                           JavaWriter.type(Type.class),
+                           JavaWriter.type(GsonBuilder.class))
                    .emitStaticImports(JavaWriter.type(Prestige.class) + "._TAG")
 				   .emitEmptyLine()
 				   .emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
@@ -1102,15 +1133,17 @@ public class AnnotationProcessor extends AbstractProcessor {
                 java_writer.emitJavadoc("Provider for {@link %s} for {@link %s}", JavaWriter.type(GsonConverter.class),
                                         model._interface)
                            .emitAnnotation(Inject.class)
-                           .emitField(JavaWriter.type(Lazy.class, JavaWriter.type(GsonConverter.class, model._interface + "")),
+                           .emitAnnotation(Named.class, stringLiteral(model._interface + ""))
+                           .emitField(JavaWriter.type(Lazy.class, JavaWriter.type(GsonConverter.class)),
                                    model._variable_name + _CONVERTOR);
 		}
 		// Constructor
 		java_writer.emitEmptyLine()
 		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
 		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier,
-		        		        "java.lang.String", "scope",
-                                JavaWriter.type(Timber.class), "log")
+                           "java.lang.String", "scope",
+                           JavaWriter.type(Timber.class), "log")
+                   .emitStatement("_scope = scope")
                    .emitStatement("_log = log")
 		           .emitStatement("final List<Object> modules = new ArrayList<Object>()")
 		           .emitSingleLineComment("Controller modules");
@@ -1136,11 +1169,11 @@ public class AnnotationProcessor extends AbstractProcessor {
             String production_module = null;
 			for (ModuleData model_module : model_modules)
 				if (model_module._scope.equals(Implementations.PRODUCTION)) {
-					production_module = String.format(Locale.US, "modules.add(new %s(_log))", model_module._qualified_name);
+					production_module = String.format(Locale.US, "modules.add(new %s(_log, this))", model_module._qualified_name);
 				} else {
                     java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
                                                              , if_else_if_control, model_module._scope))
-                               .emitStatement("modules.add(new %s(_log))", model_module._qualified_name)
+                               .emitStatement("modules.add(new %s(_log, this))", model_module._qualified_name)
                                .endControlFlow();
                     if_else_if_control = else_if;
                 }
@@ -1149,16 +1182,16 @@ public class AnnotationProcessor extends AbstractProcessor {
 		java_writer.emitStatement("_object_graph = ObjectGraph.create(modules.toArray())")
 		           .emitStatement("_object_graph.inject(this)")
 		           .emitStatement(
-				"_presentation_controllers = ImmutableMap.<Class<?>, Provider>builder()%n" +
-				"%s.build()",
-				controller_puts)
+                           "_presentation_controllers = ImmutableMap.<Class<?>, Provider>builder()%n" +
+                                   "%s.build()",
+                           controller_puts)
 				   .emitStatement(
-                "_model_implementations = ImmutableMap.<Class<?>, Lazy>builder()%n%s.build()", model_puts)
+                           "_model_implementations = ImmutableMap.<Class<?>, Lazy>builder()%n%s.build()", model_puts)
 		           .emitStatement("_controllers = new HashMap<Class<?>, Object>()")
 				   .endMethod()
 				   .emitEmptyLine()
 				   // SegueController Contract 
-				   .emitAnnotation(SuppressWarnings.class, JavaWriter.stringLiteral("unchecked"))
+				   .emitAnnotation(SuppressWarnings.class, stringLiteral("unchecked"))
 				   .emitAnnotation(Override.class)
 				   .beginMethod("<T> T", "dataSource", public_modifier, "Class<?>", "target")
                    .emitStatement("_log.tag(_TAG).d(\"Injecting \" + _controllers.get(target) + \" into \" + target)")
@@ -1172,7 +1205,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
 				   .beginMethod("void", "createController", public_modifier,
-                                JavaWriter.type(Activity.class), "activity")
+                           JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
@@ -1183,54 +1216,54 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "didDestroyActivity", public_modifier, 
-						        JavaWriter.type(Activity.class), "activity")
+				   .beginMethod("void", "didDestroyActivity", public_modifier,
+                           JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
                    .emitStatement("_log.tag(_TAG).d(\"Vanishing \" + _controllers.get(activity_class) +"
-                                + " \"(for \" + activity + \")\")")
+                           + " \"(for \" + activity + \")\")")
 				   .emitStatement("_controllers.remove(activity_class)")
 				   .endMethod()
 				   .emitEmptyLine()
-				   .emitAnnotation(SuppressWarnings.class, JavaWriter.stringLiteral("unchecked"))
+				   .emitAnnotation(SuppressWarnings.class, stringLiteral("unchecked"))
 				   .emitAnnotation(Override.class)
-				   .beginMethod("<T> T", "createModel", public_modifier, "Class<T>", "model_interface")
-				   .emitStatement("return (T) _model_implementations.get(model_interface).get()")
+				   .beginMethod("<M, I extends M> I", "createModel", public_modifier, "Class<M>", "model_interface")
+				   .emitStatement("return (I) _model_implementations.get(model_interface).get()")
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
 				   .beginMethod("void", "attachPresentationFragment", public_modifier,
-                                JavaWriter.type(Activity.class), "activity",
-                                JavaWriter.type(Object.class), "presentation_fragment",
-                                JavaWriter.type(String.class), "tag")
+                           JavaWriter.type(Activity.class), "activity",
+                           JavaWriter.type(Object.class), "presentation_fragment",
+                           JavaWriter.type(String.class), "tag")
 				   .emitStatement("final Object controller = _controllers.get(activity.getClass())")
 				   .beginControlFlow("if (controller != null)")
                    .emitStatement("_log.tag(_TAG).d(\"Attaching \" + presentation_fragment + \" to \" + "
-                                + "controller +\"(for \" + activity + \")\")")
+                           + "controller + \" (for \" + activity + \")\")")
 				   .emitStatement("Prestige.attachPresentationFragment(controller, presentation_fragment, tag)")
 				   .endControlFlow()
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
 				   .beginMethod("void", "registerForControllerBus", public_modifier,
-                                JavaWriter.type(Activity.class), "activity")
+                           JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
                    .emitStatement("_log.tag(_TAG).d(\"Registering \" + _controllers.get(activity_class) +"
-                                + " \"to receive messages (for \" + activity + \")\")")
+                           + " \" to receive messages (for \" + activity + \")\")")
 				   .emitStatement("controller_bus.register(_controllers.get(activity_class))")
 				   .endMethod()
 				   .emitEmptyLine()
 				   .emitAnnotation(Override.class)
 				   .beginMethod("void", "unregisterForControllerBus", public_modifier,
-                                JavaWriter.type(Activity.class), "activity")
+                           JavaWriter.type(Activity.class), "activity")
 				   .emitStatement("final Class<?> activity_class = activity.getClass()")
 				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
 				   .emitEmptyLine()
                    .emitStatement("_log.tag(_TAG).d(\"Unregistering \" + _controllers.get(activity_class) +"
-                               + " \"to receive messages (for \" + activity + \")\")")
+                           + " \" to receive messages (for \" + activity + \")\")")
 				   .emitStatement("controller_bus.unregister(_controllers.get(activity_class))")
 				   .endMethod()
 				   .emitEmptyLine()
@@ -1241,23 +1274,90 @@ public class AnnotationProcessor extends AbstractProcessor {
                    .endMethod()
                    .emitEmptyLine()
                    .emitAnnotation(Override.class)
+                   .beginMethod("void", "storeController", public_modifier, JavaWriter.type(Activity.class), "activity")
+                   .emitStatement("final Class<?> activity_class = activity.getClass()")
+                   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
+                   .emitEmptyLine()
+                   .emitStatement("_log.tag(_TAG).d(\"Storing controller \" + _controllers.get(activity_class) +"
+                           + " \" (for \" + activity + \")\")")
+                   .beginControlFlow("try")
+                   .emitStatement("Prestige.store(_controllers.get(activity_class))")
+                   .nextControlFlow("catch (IOException exception)")
+                   .emitStatement("_log.tag(_TAG).d(exception, \"Error storing controller\" + _controllers.get(activity_class))")
+                   .endControlFlow()
+                   .endMethod()
+                   .emitEmptyLine()
+                   .emitAnnotation(Override.class)
+                   .emitAnnotation(Nonnull.class)
+                   .beginMethod("<M, I extends M> " + JavaWriter.type(InstanceCreator.class, "I"), "instanceCreator"
+                           , public_modifier, "final " + JavaWriter.type(Class.class, "M"), "type")
+                   .emitStatement(Joiner.on("%n").join(
+                           "return new InstanceCreator<I>() {"
+                           , "    public I createInstance(Type _) {"
+                           , "      return createModel(type);"
+                           , "    }"
+                           , "}"))
+                   .endMethod()
+                   .emitEmptyLine()
+                   .emitAnnotation(Override.class)
                    .beginMethod("<T> void", "store", public_modifier, newArrayList("T", "object")
-                           , newArrayList(JavaWriter.type(IOException.class)))
-                   .emitStatement("_log.tag(_TAG).d(\"Storing \" + object)");
+                           , newArrayList(JavaWriter.type(IOException.class)));
         if_else_if_control = "if";
+        String nested_if_else_if;
         for (ModelData model : models) {
             if (!model._should_serialize) continue;
 
+            nested_if_else_if = "if";
             java_writer.beginControlFlow(String.format("%s (object instanceof %s)", if_else_if_control, model._interface))
-                       .emitStatement("_log.tag(_TAG).d(\"\\tStoring \" + object)")
-                       .emitStatement("%s.get().toStream((%s) object, gson_provider.get().outputStreamFor(%s.class))"
-                                    , model._variable_name + _CONVERTOR, model._interface, model._interface)
-                       .endControlFlow();
+                       .emitStatement("_log.tag(_TAG).d(\"Storing \" + object)")
+                       .emitStatement("%s%s.get().toStream(object, gson_provider.get().outputStreamFor(%s.class))"
+                               , model._variable_name, _CONVERTOR, model._interface);
+
+            // TODO: avoid storing the same model multiple times in one pass
+            for (Entry<String, Map<Element, ModelData>> entry : model_implementations.entrySet()) {
+                ModelData model_implementation = entry.getValue().get(model._interface);
+                if (model_implementation == null)
+                    model_implementation = model_implementations.containsKey(PRODUCTION)? model_implementations.get(PRODUCTION).get(model._interface) : null;
+                if (model_implementation == null || !model_implementation._should_serialize || model_implementation._parameters == null) continue;
+
+                java_writer.beginControlFlow(String.format("%s (_scope.equals(\"%s\"))", nested_if_else_if, entry.getKey()));
+                for (Element parameter : model_implementation._parameters) {
+                    final ModelData sub_model = element_to_model_interfaces.get(_type_utilities.asElement(parameter.asType()));
+                    // This should never actually occur without error in Annotation Processor
+                    if (sub_model == null) {
+                        processingEnv.getMessager().printMessage(ERROR, "Unexpected error, Model is null");
+                        continue;
+                    }
+                    if (!sub_model._should_serialize) continue;
+                    java_writer.emitStatement("store(createModel(%s.class))", sub_model._interface);
+                }
+                java_writer.endControlFlow();
+                nested_if_else_if = else_if;
+            }
+            if (nested_if_else_if.equals(else_if)) {
+                ModelData model_implementation = model_implementations.get(PRODUCTION).get(model._interface);
+                if (model_implementation == null || !model_implementation._should_serialize || model_implementation._parameters == null) continue;
+                java_writer.beginControlFlow("else");
+                for (Element parameter : model_implementation._parameters) {
+                    final ModelData sub_model = element_to_model_interfaces.get(_type_utilities.asElement(parameter.asType()));
+                    // This should never actually occur without error in Annotation Processor
+                    if (sub_model == null) {
+                        processingEnv.getMessager().printMessage(ERROR, "Unexpected error, Model is null");
+                        continue;
+                    }
+                    if (!sub_model._should_serialize) continue;
+                    java_writer.emitStatement("store(createModel(%s.class))", sub_model._interface);
+                }
+                java_writer.endControlFlow();
+            }
+            java_writer.endControlFlow();
             if_else_if_control = else_if;
         }
         java_writer.endMethod()
+		           // Private fields
                    .emitEmptyLine()
-				   // Private fields
+                   .emitJavadoc("The current scope")
+                   .emitField(JavaWriter.type(String.class), "_scope", private_final)
                    .emitJavadoc("Log where messages are written")
                    .emitField(JavaWriter.type(Timber.class), "_log", private_final)
 				   .emitJavadoc("Dependency injection object graph")
@@ -1285,6 +1385,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			                             String class_name) throws IOException {
 		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
 		JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage(package_name)
 				   .emitImports("javax.inject.Named",
@@ -1339,6 +1440,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateDataSourceInjector(Writer writer, String package_name, Element target, String variable_name,
 			                                String class_name) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitImports(JavaWriter.type(Finder.class))
@@ -1365,6 +1467,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	}
 	
 	/**
+     * TODO: should there be a no-op GsonConverter for when model is serialized only under certain scopes? Or move that declaration to @Model
 	 * @param writer
 	 * @param package_name
 	 * @param models
@@ -1372,19 +1475,29 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 */
 	private void generateModelModule(Writer writer, String package_name, List<ModelData> models, String class_name) 
 			throws IOException {
-		JavaWriter java_writer = new JavaWriter(writer);
+        final String file_tested = "_file_tested";
+        final EnumSet<Modifier> private_final = EnumSet.of(PRIVATE, FINAL);
+        final EnumSet<Modifier> private_modifier = EnumSet.of(PRIVATE);
+		final JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage(package_name)
-				   .emitImports("javax.inject.Named",
-						        "com.imminentmeals.prestige._SegueController",
+				   .emitImports("com.imminentmeals.prestige._SegueController",
 						        "dagger.Module",
 						        "dagger.Provides",
 						        "javax.inject.Singleton",
+                                JavaWriter.type(Gson.class),
                                 JavaWriter.type(GsonProvider.class),
                                 JavaWriter.type(GsonConverter.class),
-                                JavaWriter.type(File.class),
-                                JavaWriter.type(FileInputStream.class),
-                                JavaWriter.type(FileNotFoundException.class))
+                                JavaWriter.type(InputStream.class),
+                                JavaWriter.type(IOException.class),
+                                JavaWriter.type(Named.class),
+                                JavaWriter.type(ExclusionStrategy.class),
+                                JavaWriter.type(FieldAttributes.class),
+                                JavaWriter.type(InstanceCreator.class),
+                                JavaWriter.type(Set.class),
+                                JavaWriter.type(SegueController.class))
+                   .emitStaticImports(JavaWriter.type(Sets.class) + ".newHashSet")
 				   .emitEmptyLine();
 		final StringBuilder model_list = new StringBuilder();
 		for (ModelData model : models) {
@@ -1404,8 +1517,17 @@ public class AnnotationProcessor extends AbstractProcessor {
                            "complete", false))
 				   .beginType(class_name, "class", EnumSet.of(PUBLIC))
 				   .emitEmptyLine()
-                   .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log")
+                   .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log"
+                              , JavaWriter.type(SegueController.class), "segue_controller")
                    .emitStatement("_log = log")
+                   .emitStatement("_segue_controller = segue_controller")
+                   .endMethod()
+                   .emitEmptyLine()
+                   .emitAnnotation(Provides.class)
+                   .emitAnnotation(Singleton.class)
+                   .beginMethod(JavaWriter.type(Gson.class), "providesGson", EnumSet.noneOf(Modifier.class)
+                              , JavaWriter.type(GsonProvider.class), "gson_provider")
+                   .emitStatement("return buildGson(gson_provider.gsonBuilder())")
                    .endMethod();
 		// Model providers
 		for (ModelData model : models) {
@@ -1416,12 +1538,12 @@ public class AnnotationProcessor extends AbstractProcessor {
                     ? new String[] {
                         JavaWriter.type(GsonProvider.class)
                       , "gson_provider"
-                      , JavaWriter.type(GsonConverter.class, model._interface + "")
+                      , "@Named(" + stringLiteral(model._interface + "")+ ") " + JavaWriter.type(GsonConverter.class)
                       , "converter" }
                     : new String[0];
             final String[] new_instance_format_parameters;
 			if (model._parameters == null || model._parameters.isEmpty()) {
-                new_instance_format_parameters = new String[] { model._implementation + "", "" };
+                new_instance_format_parameters = new String[] { java_writer.compressType(model._implementation + ""), "" };
             } else {
 				final Set<String> provider_method_parameters = newLinkedHashSet(Arrays.asList(provider_parameters));
 				final List<String> constructor_parameters = newArrayList();
@@ -1435,20 +1557,33 @@ public class AnnotationProcessor extends AbstractProcessor {
 				}
                 provider_parameters = provider_method_parameters.toArray(provider_parameters);
                 new_instance_format_parameters = new String[] {
-                        model._implementation + ""
+                        java_writer.compressType(model._implementation + "")
                       , Joiner.on(", ").join(constructor_parameters) };
 			}
             java_writer.beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
                     EnumSet.noneOf(Modifier.class), provider_parameters);
             if (model._should_serialize) {
-                java_writer.emitStatement("final File file = gson_provider.fileFor(" + model._implementation + ".class)")
+                java_writer.emitStatement("InputStream input_stream = null")
                            .beginControlFlow("try")
-                           .emitStatement("_log.tag(_TAG).d(file.exists() ? \"Restoring %s from file\" "
-                                        + ": \"Creating model %s\")", model._implementation, model._interface)
-                        .emitStatement("return file.exists()? converter.from(new FileInputStream(file)) : new %s(%s)"
-                                        , new_instance_format_parameters)
-                           .nextControlFlow("catch (FileNotFoundException _)")
+                           .beginControlFlow(String.format("if (!_%s%s)", model._variable_name, file_tested))
+                           .emitStatement("_%s%s = true", model._variable_name, file_tested)
+                           .emitStatement("input_stream = gson_provider.inputStreamFor(%s.class)", model._interface)
+                           .emitStatement("_log.tag(_TAG).d(\"Restoring %s from input stream\")", java_writer.compressType(model._implementation + ""))
+                           .emitStatement("return (%s) converter.from(input_stream)", java_writer.compressType(model._implementation + ""))
+                           .nextControlFlow("else")
                            .emitStatement("return new %s(%s)", new_instance_format_parameters)
+                           .endControlFlow()
+                           .nextControlFlow("catch (Exception _)")
+                           .emitStatement("_log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model._interface)
+                           .emitStatement("_log.tag(_TAG).e(_, \"With error: \")")
+                           .emitStatement("return new %s(%s)", new_instance_format_parameters)
+                           .nextControlFlow("finally")
+                           .beginControlFlow("if (input_stream != null)")
+                           .beginControlFlow("try")
+                           .emitStatement("input_stream.close()")
+                           .nextControlFlow("catch (IOException _)")
+                           .endControlFlow()
+                           .endControlFlow()
                            .endControlFlow()
                            .endMethod();
 
@@ -1456,22 +1591,55 @@ public class AnnotationProcessor extends AbstractProcessor {
                 java_writer.emitEmptyLine()
                         .emitAnnotation(Provides.class)
                         .emitAnnotation(Singleton.class)
-                        .beginMethod(JavaWriter.type(GsonConverter.class, model._interface + ""),
+                        .emitAnnotation(Named.class, stringLiteral(model._interface + ""))
+                        .beginMethod(JavaWriter.type(GsonConverter.class),
                                 "provides" + model._implementation.getSimpleName() + "Converter",
-                                EnumSet.noneOf(Modifier.class),
-                                JavaWriter.type(GsonProvider.class), "gson_provider")
-                        .emitStatement("return new GsonConverter<" + model._interface + ">(" +
-                                "gson_provider.gson(), " + model._implementation + ".class)")
+                                EnumSet.noneOf(Modifier.class), JavaWriter.type(Gson.class), "gson")
+                        .emitStatement("return new %s(gson, %s.class)"
+                                , JavaWriter.type(GsonConverter.class, model._implementation + ""), model._implementation)
                         .endMethod();
             } else {
                 java_writer.emitStatement("return new %s(%s)", new_instance_format_parameters)
                            .endMethod();
             }
         }
-		java_writer.emitJavadoc("Log where messages are written")
-                   .emitField(JavaWriter.type(Timber.class), "_log", EnumSet.of(PRIVATE, FINAL))
-                   .emitField(JavaWriter.type(String.class), "_TAG", EnumSet.of(PRIVATE, STATIC, FINAL), "\"Prestige\"")
-                   .endType();
+		java_writer.emitEmptyLine()
+                   .beginMethod(JavaWriter.type(Gson.class), "buildGson", EnumSet.of(PRIVATE)
+                              , JavaWriter.type(GsonBuilder.class), "gson_builder");
+        final Joiner new_line_joiner = Joiner.on("%n");
+        final List<String> model_exclusions = newArrayListWithCapacity(models.size());
+        final String model_exclusion = "(Class) %s.class";
+        for (ModelData model : models) {
+            model_exclusions.add(String.format(model_exclusion, model._interface));
+            if (model._should_serialize) {
+                java_writer.emitStatement("final InstanceCreator<%1$s> %1$s_creator = _segue_controller.instanceCreator(%2$s.class)"
+                                        , java_writer.compressType(model._implementation + ""), model._interface)
+                           .emitStatement("gson_builder.registerTypeAdapter(%1$s.class, %1$s_creator)"
+                                   , java_writer.compressType(model._implementation + ""));
+            }
+        }
+        java_writer.emitStatement(new_line_joiner.join(
+                "gson_builder.addSerializationExclusionStrategy(new ExclusionStrategy() {"
+              , "    public boolean shouldSkipField(FieldAttributes field) {"
+              , "      return _models.contains(field.getDeclaredClass());"
+              , "    }"
+              , "    public boolean shouldSkipClass(Class<?> _) {"
+              , "      return false;"
+              , "    }"
+              , "    private final Set<Class> _models = newHashSet(%s);"
+              , "})"), Joiner.on(",\n\t\t").join(model_exclusions))
+                   .emitStatement("return gson_builder.create()")
+                   .endMethod()
+                   .emitEmptyLine()
+                   .emitJavadoc("Log where messages are written")
+                   .emitField(JavaWriter.type(Timber.class), "_log", private_final)
+                   .emitField(JavaWriter.type(String.class), "_TAG", EnumSet.of(PRIVATE, STATIC, FINAL), stringLiteral("Prestige"))
+                   .emitJavadoc("Segue Controller")
+                   .emitField(JavaWriter.type(SegueController.class), "_segue_controller", private_final);
+        for (ModelData model : models)
+            if (model._should_serialize)
+                java_writer.emitField(JavaWriter.type(boolean.class), '_' + model._variable_name + file_tested, private_modifier, "false");
+        java_writer.endType();
 		java_writer.close();
 	}
 	
@@ -1483,6 +1651,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateModelInjector(Writer writer, String package_name, List<ModelInjectionData> injections,
 			                           String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 			       .emitEmptyLine()
@@ -1518,6 +1687,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	private void generateControllerPresentationFragmentInjector(Writer writer, String package_name, 
 			List<PresentationFragmentInjectionData> injections, String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitEmptyLine()
@@ -1559,6 +1729,7 @@ public class AnnotationProcessor extends AbstractProcessor {
     private void generatePresentationFragmentInjector(Writer writer, String package_name,
 			Map<Integer, List<PresentationFragmentInjectionData>> injections, String class_name, Element target) throws IOException {
 		final JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitEmptyLine()
@@ -1613,6 +1784,7 @@ public class AnnotationProcessor extends AbstractProcessor {
     private void generateControllerPresentationInjector(Writer writer, String package_name, PresentationInjectionData injection,
                                                         String class_name, Element target) throws IOException {
         final JavaWriter java_writer = new JavaWriter(writer);
+        java_writer.setCompressingTypes(true);
         java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
                 .emitPackage(package_name)
                 .emitEmptyLine()
@@ -1792,6 +1964,11 @@ public class AnnotationProcessor extends AbstractProcessor {
                 && (_implementation == null || other._implementation == null
                  || _implementation.equals(other._implementation));
         }
+
+        @Override
+        public String toString() {
+            return _interface + "";
+        }
     }
 	
 	/**
@@ -1889,16 +2066,18 @@ public class AnnotationProcessor extends AbstractProcessor {
 		private final Element _variable;
 		private final String _variable_name;
 		private final String _class_name;
+        private final boolean _should_serialize;
 		
 		/**
 		 * <p>Constructs a {@link ModelInjectionData}.</p>
 		 * @param variable The variable in which to inject the Model
 		 */
-		public ModelInjectionData(String package_name, Element variable, String element_class) {
+		public ModelInjectionData(String package_name, Element variable, String element_class, boolean should_serialize) {
 			_package_name = package_name;
 			_variable = variable;
 			_variable_name = variable.getSimpleName() + "";
 			_class_name = element_class.substring(package_name.length() + 1) + MODEL_INJECTOR_SUFFIX;
+            _should_serialize = should_serialize;
 		}
 	}
 	

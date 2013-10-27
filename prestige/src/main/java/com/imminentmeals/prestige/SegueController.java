@@ -2,6 +2,8 @@ package com.imminentmeals.prestige;
 
 import android.app.Activity;
 
+import com.google.gson.InstanceCreator;
+
 import java.io.IOException;
 
 import javax.annotation.Nonnull;
@@ -18,9 +20,9 @@ public interface SegueController {
 
 	void sendMessage(Object message);
 	
-	void createController(Activity activity); 
-	
-	<T> T createModel(Class<T> model_interface);
+	void createController(Activity activity);
+
+    <M, I extends M> I createModel(Class<M> model_interface);
 	
 	void didDestroyActivity(Activity activity);
 	
@@ -33,4 +35,8 @@ public interface SegueController {
     <T> void store(T object) throws IOException;
 
     @Nonnull Timber timber();
+
+    void storeController(Activity activity);
+
+    @Nonnull <M, I extends M> InstanceCreator<I> instanceCreator(Class<M> type);
 }

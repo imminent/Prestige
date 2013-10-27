@@ -90,6 +90,7 @@ public final class Prestige {
 	 * @return The Segue Controller
 	 */
 	public static void conjureSegueController(String scope, Timber log) {
+        // TODO: throw error to crash at runtime (messages get lost in the swarm of logs anyways)
 		try {
 			final Class<?> segue_controller = Class.forName("com.imminentmeals.prestige._SegueController");
 			_segue_controller = (SegueController) segue_controller.getConstructor(String.class, Timber.class)
@@ -103,7 +104,7 @@ public final class Prestige {
 		} catch (IllegalAccessException exception) {
             logProblemWithSetup(exception, log);
 		} catch (InvocationTargetException exception) {
-            logProblemWithSetup(exception, log);
+            logProblemWithSetup(exception.getTargetException(), log);
 		} catch (NoSuchMethodException exception) {
             logProblemWithSetup(exception, log);
         } catch (ClassNotFoundException exception) {
@@ -167,7 +168,9 @@ public final class Prestige {
 			}
 			
 			@Override
-			public void onActivityStopped(Activity _) { }
+			public void onActivityStopped(Activity activity) {
+                storeController(activity);
+            }
 			
 			@Override
 			public void onActivityStarted(Activity _) { }
@@ -220,28 +223,11 @@ public final class Prestige {
 		_segue_controller.attachPresentationFragment(activity, fragment, fragment.getTag());
 	}
 
-    @SuppressWarnings({"unchecked", "UnusedDeclaration"})
-    public static <T> void store(T source) throws IOException {
-        final Class<?> source_class = source.getClass();
-        try {
-            final Method inject;
-            if (!_MODEL_STORERS.containsKey(source_class)) {
-                final Class<?> injector = Class.forName(source_class.getName() + AnnotationProcessor.MODEL_INJECTOR_SUFFIX);
-                inject = injector.getMethod("storeModels", SegueController.class, source_class);
-                _MODEL_STORERS.put(source_class, inject);
-            } else
-                inject = _MODEL_STORERS.get(source_class);
-            // Allows for no-ops when there's nothing to store
-            if (inject != null)
-                inject.invoke(null, _segue_controller, source);
-        } catch (ClassNotFoundException _) {
-            // Allows store to be called on targets without injected Models
-            _MODEL_STORERS.put(source_class, _NO_OP);
-        } catch (InvocationTargetException exception) {
-            throw new UnableToStoreException("Unable to store Models for " + source, exception.getTargetException());
-        } catch (Exception exception) {
-            throw new UnableToStoreException("Unable to store Models for " + source, exception);
-        }
+    public static void storeController(Activity activity) {
+        if (_segue_controller == null)
+            throw new IllegalStateException("Attempting to store controller before Segue Controller was created " +
+                    "(Prestige.conjureSegueController(String)).");
+        _segue_controller.storeController(activity);
     }
 
     public static void injectModels(Object target) {
@@ -413,8 +399,32 @@ public final class Prestige {
 		}
 	}
 
+    @SuppressWarnings({"unchecked", "UnusedDeclaration"})
+    /* package */static <T> void store(T source) throws IOException {
+        final Class<?> source_class = source.getClass();
+        try {
+            final Method inject;
+            if (!_MODEL_STORERS.containsKey(source_class)) {
+                final Class<?> injector = Class.forName(source_class.getName() + AnnotationProcessor.MODEL_INJECTOR_SUFFIX);
+                inject = injector.getMethod("storeModels", SegueController.class, source_class);
+                _MODEL_STORERS.put(source_class, inject);
+            } else
+                inject = _MODEL_STORERS.get(source_class);
+            // Allows for no-ops when there's nothing to store
+            if (inject != null)
+                inject.invoke(null, _segue_controller, source);
+        } catch (ClassNotFoundException _) {
+            // Allows store to be called on targets without injected Models
+            _MODEL_STORERS.put(source_class, _NO_OP);
+        } catch (InvocationTargetException exception) {
+            throw new UnableToStoreException("Unable to store Models for " + source, exception.getTargetException());
+        } catch (Exception exception) {
+            throw new UnableToStoreException("Unable to store Models for " + source, exception);
+        }
+    }
+
 /* Private Helpers */
-    private static void logProblemWithSetup(Exception exception, Timber log) {
+    private static void logProblemWithSetup(Throwable exception, Timber log) {
         log.tag(_TAG).e(exception, "Problem with Prestige setup");
     }
 	
