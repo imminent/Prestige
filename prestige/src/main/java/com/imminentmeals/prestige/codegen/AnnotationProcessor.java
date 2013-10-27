@@ -40,13 +40,16 @@ import com.imminentmeals.prestige.annotations.PresentationFragmentImplementation
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.javawriter.JavaWriter;
+import com.squareup.otto.Bus;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,6 +67,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
@@ -79,6 +83,7 @@ import javax.tools.JavaFileObject;
 
 import dagger.Lazy;
 import dagger.Module;
+import dagger.ObjectGraph;
 import dagger.Provides;
 import timber.log.Timber;
 
@@ -1082,26 +1087,24 @@ public class AnnotationProcessor extends AbstractProcessor {
         java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage("com.imminentmeals.prestige")
-		           .emitImports("java.util.HashMap",
-                           "java.util.ArrayList",
-                           "java.util.List",
-                           "java.util.Map",
-                           "javax.inject.Inject",
-                           "javax.inject.Named",
-                           "javax.inject.Provider",
-                           JavaWriter.type(Lazy.class),
-                           "android.app.Activity",
-                           "com.google.common.collect.ImmutableMap",
-                           "com.squareup.otto.Bus",
-                           "dagger.Module",
-                           "dagger.ObjectGraph",
-                           JavaWriter.type(GsonConverter.class),
-                           JavaWriter.type(GsonProvider.class),
-                           JavaWriter.type(IOException.class),
-                           JavaWriter.type(Gson.class),
-                           JavaWriter.type(InstanceCreator.class),
-                           JavaWriter.type(Type.class),
-                           JavaWriter.type(GsonBuilder.class))
+		           .emitImports(JavaWriter.type(Activity.class)
+                              , JavaWriter.type(ImmutableMap.class)
+                              , JavaWriter.type(InstanceCreator.class)
+                              , JavaWriter.type(GsonConverter.class)
+                              , JavaWriter.type(Bus.class)
+                              , JavaWriter.type(IOException.class)
+                              , JavaWriter.type(Type.class)
+                              , JavaWriter.type(ArrayList.class)
+                              , JavaWriter.type(HashMap.class)
+                              , JavaWriter.type(List.class)
+                              , JavaWriter.type(Map.class)
+                              , JavaWriter.type(Inject.class)
+                              , JavaWriter.type(Named.class)
+                              , JavaWriter.type(Provider.class)
+                              , JavaWriter.type(Lazy.class)
+                              , JavaWriter.type(ObjectGraph.class)
+                              , JavaWriter.type(Timber.class))
+                   .emitEmptyLine()
                    .emitStaticImports(JavaWriter.type(Prestige.class) + "._TAG")
 				   .emitEmptyLine()
 				   .emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
@@ -1376,6 +1379,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	}
 	
 	/**
+     * TODO: move Controller Bus provider to a Segue Controller module?
 	 * @param writer
 	 * @param package_name
 	 * @param controllers
