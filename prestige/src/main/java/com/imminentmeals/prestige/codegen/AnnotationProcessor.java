@@ -1458,7 +1458,6 @@ public class AnnotationProcessor extends AbstractProcessor {
                            .endControlFlow()
                            .nextControlFlow("catch (Exception _)")
                            .emitStatement("_log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model._interface)
-                           .emitStatement("_log.tag(_TAG).e(_, \"With error: \")")
                            .emitStatement("return new %s(%s)", new_instance_format_parameters)
                            .nextControlFlow("finally")
                            .beginControlFlow("if (input_stream != null)")
