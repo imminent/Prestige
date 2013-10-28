@@ -39,11 +39,10 @@ public abstract class SegueController {
         _scope = scope;
         _log = log;
         _controllers = new HashMap<Class<?>, Object>();
-        _presentation_controllers = bindPresentationsToControllers();
-        _model_implementations = provideModelImplementations();
-
         _object_graph = createObjectGraph();
         _object_graph.inject(this);
+        _presentation_controllers = bindPresentationsToControllers();
+        _model_implementations = provideModelImplementations();
     }
 
 /* SegueController Contract */
