@@ -40,16 +40,13 @@ import com.imminentmeals.prestige.annotations.PresentationFragmentImplementation
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.javawriter.JavaWriter;
-import com.squareup.otto.Bus;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -103,6 +100,7 @@ import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.element.ElementKind.INTERFACE;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
@@ -1082,40 +1080,33 @@ public class AnnotationProcessor extends AbstractProcessor {
                                                    Map<String, Map<Element, ModelData>> model_implementations)
 			                                        		throws IOException {
 		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
-		final EnumSet<Modifier> private_final = EnumSet.of(PRIVATE, FINAL);
+		final EnumSet<Modifier> protected_modifier = EnumSet.of(PROTECTED);
+        final String else_if = "else if";
+        String if_else_if_control;
 		JavaWriter java_writer = new JavaWriter(writer);
         java_writer.setCompressingTypes(true);
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 				   .emitPackage("com.imminentmeals.prestige")
-		           .emitImports(JavaWriter.type(Activity.class)
-                              , JavaWriter.type(ImmutableMap.class)
-                              , JavaWriter.type(InstanceCreator.class)
-                              , JavaWriter.type(GsonConverter.class)
-                              , JavaWriter.type(Bus.class)
-                              , JavaWriter.type(IOException.class)
-                              , JavaWriter.type(Type.class)
-                              , JavaWriter.type(ArrayList.class)
-                              , JavaWriter.type(HashMap.class)
-                              , JavaWriter.type(List.class)
-                              , JavaWriter.type(Map.class)
-                              , JavaWriter.type(Inject.class)
-                              , JavaWriter.type(Named.class)
-                              , JavaWriter.type(Provider.class)
-                              , JavaWriter.type(Lazy.class)
-                              , JavaWriter.type(ObjectGraph.class)
-                              , JavaWriter.type(Timber.class))
+		           .emitImports(JavaWriter.type(ImmutableMap.class)
+                           , JavaWriter.type(GsonConverter.class)
+                           , JavaWriter.type(IOException.class)
+                           , JavaWriter.type(ArrayList.class)
+                           , JavaWriter.type(List.class)
+                           , JavaWriter.type(Nonnull.class)
+                           , JavaWriter.type(Inject.class)
+                           , JavaWriter.type(Named.class)
+                           , JavaWriter.type(Provider.class)
+                           , JavaWriter.type(Lazy.class)
+                           , JavaWriter.type(ObjectGraph.class)
+                           , JavaWriter.type(Timber.class))
                    .emitEmptyLine()
                    .emitStaticImports(JavaWriter.type(Prestige.class) + "._TAG")
 				   .emitEmptyLine()
 				   .emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
-                                "for the current Presentation, and communicating with the Controller Bus.</p>")
-				   .beginType("com.imminentmeals.prestige._SegueController", "class", public_modifier, null,
-                              // implements
-                              "com.imminentmeals.prestige.SegueController")
-				   .emitJavadoc("Bus over which Presentations communicate to their Controllers")
-				   .emitAnnotation(Inject.class)
-				   .emitAnnotation(Named.class, ControllerContract.BUS)
-				   .emitField("com.squareup.otto.Bus", "controller_bus");
+                           "for the current Presentation, and communicating with the Controller Bus.</p>")
+				   .beginType("com.imminentmeals.prestige._SegueController", "class", public_modifier
+                           // extends
+                           , JavaWriter.type(SegueController.class));
 		final StringBuilder controller_puts = new StringBuilder();
 		for (PresentationControllerBinding binding : controllers) {
 			java_writer.emitJavadoc("Provider for instances of the {@link %s} Controller", binding._controller)
@@ -1144,164 +1135,12 @@ public class AnnotationProcessor extends AbstractProcessor {
 		java_writer.emitEmptyLine()
 		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
 		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier,
-                           "java.lang.String", "scope",
+                           JavaWriter.type(String.class), "scope",
                            JavaWriter.type(Timber.class), "log")
-                   .emitStatement("_scope = scope")
-                   .emitStatement("_log = log")
-		           .emitStatement("final List<Object> modules = new ArrayList<Object>()")
-		           .emitSingleLineComment("Controller modules");
-        final String else_if = "else if";
-        String if_else_if_control = "if";
-		if (!controller_modules.isEmpty()) {
-            String production_module = null;
-			for (ModuleData controller_module : controller_modules)
-				if (controller_module._scope.equals(Implementations.PRODUCTION)) {
-					production_module = String.format(Locale.US, "modules.add(new %s())", controller_module._qualified_name);
-				} else {
-                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
-                                                             , if_else_if_control, controller_module._scope))
-                               .emitStatement("modules.add(new %s())", controller_module._qualified_name)
-                               .endControlFlow();
-                    if_else_if_control = else_if;
-                }
-            if (production_module != null) java_writer.emitStatement(production_module);
-		}
-		java_writer.emitSingleLineComment("Model modules");
-		if (!model_modules.isEmpty()) {
-            if_else_if_control = "if";
-            String production_module = null;
-			for (ModuleData model_module : model_modules)
-				if (model_module._scope.equals(Implementations.PRODUCTION)) {
-					production_module = String.format(Locale.US, "modules.add(new %s(_log, this))", model_module._qualified_name);
-				} else {
-                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
-                                                             , if_else_if_control, model_module._scope))
-                               .emitStatement("modules.add(new %s(_log, this))", model_module._qualified_name)
-                               .endControlFlow();
-                    if_else_if_control = else_if;
-                }
-            if (production_module != null) java_writer.emitStatement(production_module);
-		}
-		java_writer.emitStatement("_object_graph = ObjectGraph.create(modules.toArray())")
-		           .emitStatement("_object_graph.inject(this)")
-		           .emitStatement(
-                           "_presentation_controllers = ImmutableMap.<Class<?>, Provider>builder()%n" +
-                                   "%s.build()",
-                           controller_puts)
-				   .emitStatement(
-                           "_model_implementations = ImmutableMap.<Class<?>, Lazy>builder()%n%s.build()", model_puts)
-		           .emitStatement("_controllers = new HashMap<Class<?>, Object>()")
+                   .emitStatement("super(scope, log)")
 				   .endMethod()
 				   .emitEmptyLine()
-				   // SegueController Contract 
-				   .emitAnnotation(SuppressWarnings.class, stringLiteral("unchecked"))
-				   .emitAnnotation(Override.class)
-				   .beginMethod("<T> T", "dataSource", public_modifier, "Class<?>", "target")
-                   .emitStatement("_log.tag(_TAG).d(\"Injecting \" + _controllers.get(target) + \" into \" + target)")
-				   .emitStatement("return (T) _controllers.get(target)")
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "sendMessage", public_modifier, "Object", "message")
-				   .emitStatement("controller_bus.post(message)")
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "createController", public_modifier,
-                           JavaWriter.type(Activity.class), "activity")
-				   .emitStatement("final Class<?> activity_class = activity.getClass()")
-				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
-				   .emitEmptyLine()
-				   .emitStatement("final Object controller = _presentation_controllers.get(activity_class).get()")
-				   .emitStatement("Prestige.injectModels(controller)")
-                   .emitStatement("Prestige.attachPresentation(controller, activity)")
-				   .emitStatement("_controllers.put(activity_class, controller)")
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "didDestroyActivity", public_modifier,
-                           JavaWriter.type(Activity.class), "activity")
-				   .emitStatement("final Class<?> activity_class = activity.getClass()")
-				   .emitStatement("if (!_presentation_controllers.containsKey(activity_class)) return")
-				   .emitEmptyLine()
-                   .emitStatement("_log.tag(_TAG).d(\"Vanishing \" + _controllers.get(activity_class) +"
-                           + " \"(for \" + activity + \")\")")
-				   .emitStatement("_controllers.remove(activity_class)")
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(SuppressWarnings.class, stringLiteral("unchecked"))
-				   .emitAnnotation(Override.class)
-				   .beginMethod("<M, I extends M> I", "createModel", public_modifier, "Class<M>", "model_interface")
-				   .emitStatement("return (I) _model_implementations.get(model_interface).get()")
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "attachPresentationFragment", public_modifier,
-                           JavaWriter.type(Activity.class), "activity",
-                           JavaWriter.type(Object.class), "presentation_fragment",
-                           JavaWriter.type(String.class), "tag")
-				   .emitStatement("final Object controller = _controllers.get(activity.getClass())")
-				   .beginControlFlow("if (controller != null)")
-                   .emitStatement("_log.tag(_TAG).d(\"Attaching \" + presentation_fragment + \" to \" + "
-                           + "controller + \" (for \" + activity + \")\")")
-				   .emitStatement("Prestige.attachPresentationFragment(controller, presentation_fragment, tag)")
-				   .endControlFlow()
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "registerForControllerBus", public_modifier,
-                           JavaWriter.type(Activity.class), "activity")
-				   .emitStatement("final Class<?> activity_class = activity.getClass()")
-				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
-				   .emitEmptyLine()
-                   .emitStatement("_log.tag(_TAG).d(\"Registering \" + _controllers.get(activity_class) +"
-                           + " \" to receive messages (for \" + activity + \")\")")
-				   .emitStatement("controller_bus.register(_controllers.get(activity_class))")
-				   .endMethod()
-				   .emitEmptyLine()
-				   .emitAnnotation(Override.class)
-				   .beginMethod("void", "unregisterForControllerBus", public_modifier,
-                           JavaWriter.type(Activity.class), "activity")
-				   .emitStatement("final Class<?> activity_class = activity.getClass()")
-				   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
-				   .emitEmptyLine()
-                   .emitStatement("_log.tag(_TAG).d(\"Unregistering \" + _controllers.get(activity_class) +"
-                           + " \" to receive messages (for \" + activity + \")\")")
-				   .emitStatement("controller_bus.unregister(_controllers.get(activity_class))")
-				   .endMethod()
-				   .emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .emitAnnotation(Nonnull.class)
-                   .beginMethod(JavaWriter.type(Timber.class), "timber", public_modifier)
-                   .emitStatement("return _log")
-                   .endMethod()
-                   .emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .beginMethod("void", "storeController", public_modifier, JavaWriter.type(Activity.class), "activity")
-                   .emitStatement("final Class<?> activity_class = activity.getClass()")
-                   .emitStatement("if (!_controllers.containsKey(activity_class)) return")
-                   .emitEmptyLine()
-                   .emitStatement("_log.tag(_TAG).d(\"Storing controller \" + _controllers.get(activity_class) +"
-                           + " \" (for \" + activity + \")\")")
-                   .beginControlFlow("try")
-                   .emitStatement("Prestige.store(_controllers.get(activity_class))")
-                   .nextControlFlow("catch (IOException exception)")
-                   .emitStatement("_log.tag(_TAG).d(exception, \"Error storing controller\" + _controllers.get(activity_class))")
-                   .endControlFlow()
-                   .endMethod()
-                   .emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .emitAnnotation(Nonnull.class)
-                   .beginMethod("<M, I extends M> " + JavaWriter.type(InstanceCreator.class, "I"), "instanceCreator"
-                           , public_modifier, "final " + JavaWriter.type(Class.class, "M"), "type")
-                   .emitStatement(Joiner.on("%n").join(
-                           "return new InstanceCreator<I>() {"
-                           , "    public I createInstance(Type _) {"
-                           , "      return createModel(type);"
-                           , "    }"
-                           , "}"))
-                   .endMethod()
-                   .emitEmptyLine()
+				   // SegueController Contract
                    .emitAnnotation(Override.class)
                    .beginMethod("<T> void", "store", public_modifier, newArrayList("T", "object")
                            , newArrayList(JavaWriter.type(IOException.class)));
@@ -1356,24 +1195,64 @@ public class AnnotationProcessor extends AbstractProcessor {
             java_writer.endControlFlow();
             if_else_if_control = else_if;
         }
-        java_writer.endMethod()
-		           // Private fields
-                   .emitEmptyLine()
-                   .emitJavadoc("The current scope")
-                   .emitField(JavaWriter.type(String.class), "_scope", private_final)
-                   .emitJavadoc("Log where messages are written")
-                   .emitField(JavaWriter.type(Timber.class), "_log", private_final)
-				   .emitJavadoc("Dependency injection object graph")
-				   .emitField("ObjectGraph", "_object_graph", private_final)
-				   .emitJavadoc("Provides the Controller implementation for the given Presentation Implementation")
-				   .emitField("ImmutableMap<Class<?>, Provider>",
-                              "_presentation_controllers", private_final)
-				   .emitJavadoc("Maintains the Controller references as they are being used")
-				   .emitField("Map<Class<?>, Object>",
-                              "_controllers", private_final)
-				   .emitJavadoc("Provides the Model implementation for the given Model interface")
-				   .emitField("Map<Class<?>, Lazy>", "_model_implementations", private_final)
-				   .endType()
+        java_writer.endMethod();
+        // createObjectGraph
+        if_else_if_control = "if";
+        java_writer.emitEmptyLine()
+                   .emitAnnotation(Override.class)
+                   .emitAnnotation(Nonnull.class)
+                   .beginMethod(JavaWriter.type(ObjectGraph.class), "createObjectGraph", protected_modifier)
+                   .emitStatement("final List<Object> modules = new ArrayList<Object>()")
+                   .emitSingleLineComment("Controller modules");
+        if (!controller_modules.isEmpty()) {
+            String production_module = null;
+            for (ModuleData controller_module : controller_modules)
+                if (controller_module._scope.equals(Implementations.PRODUCTION)) {
+                    production_module = String.format(Locale.US, "modules.add(new %s())", controller_module._qualified_name);
+                } else {
+                    java_writer.beginControlFlow(String.format(Locale.US, "%s (_scope.equals(\"%s\"))"
+                            , if_else_if_control, controller_module._scope))
+                            .emitStatement("modules.add(new %s())", controller_module._qualified_name)
+                            .endControlFlow();
+                    if_else_if_control = else_if;
+                }
+            if (production_module != null) java_writer.emitStatement(production_module);
+        }
+        java_writer.emitSingleLineComment("Model modules");
+        if (!model_modules.isEmpty()) {
+            if_else_if_control = "if";
+            String production_module = null;
+            for (ModuleData model_module : model_modules)
+                if (model_module._scope.equals(Implementations.PRODUCTION)) {
+                    production_module = String.format(Locale.US, "modules.add(new %s(_log, this))", model_module._qualified_name);
+                } else {
+                    java_writer.beginControlFlow(String.format(Locale.US, "%s (_scope.equals(\"%s\"))"
+                            , if_else_if_control, model_module._scope))
+                            .emitStatement("modules.add(new %s(_log, this))", model_module._qualified_name)
+                            .endControlFlow();
+                    if_else_if_control = else_if;
+                }
+            if (production_module != null) java_writer.emitStatement(production_module);
+        }
+        java_writer.emitStatement("return ObjectGraph.create(modules.toArray())")
+                   .endMethod();
+        // bindPresentationsToControllers
+        java_writer.emitEmptyLine()
+                   .emitAnnotation(Override.class)
+                   .emitAnnotation(Nonnull.class)
+                   .beginMethod(JavaWriter.type(ImmutableMap.class, JavaWriter.type(Class.class, "?"), JavaWriter.type(Provider.class))
+                           , "bindPresentationsToControllers", protected_modifier)
+                   .emitStatement("return ImmutableMap.<Class<?>, Provider>builder()%n%s.build()", controller_puts)
+                   .endMethod();
+        // provideModelImplementations
+        java_writer.emitEmptyLine()
+                   .emitAnnotation(Override.class)
+                   .emitAnnotation(Nonnull.class)
+                   .beginMethod(JavaWriter.type(ImmutableMap.class, JavaWriter.type(Class.class, "?"), JavaWriter.type(Lazy.class))
+                           , "provideModelImplementations", protected_modifier)
+                   .emitStatement("return ImmutableMap.<Class<?>, Lazy>builder()%n%s.build()", model_puts)
+                   .endMethod();
+	    java_writer.endType()
 				   .emitEmptyLine();
 		java_writer.close();
 	}
