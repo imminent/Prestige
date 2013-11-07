@@ -1,12 +1,4 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:0.5.+'
-    }
-}
+//apply plugin: 'sonar-runner'
 
 def isReleaseBuild() {
     return version.contains("SNAPSHOT") == false
@@ -28,4 +20,21 @@ allprojects {
     tasks.withType(Compile) {
         options.encoding = "UTF-8"
     }
+}
+
+// Sets up Sonar plugin
+//sonarRunner {
+//    sonarProperties {
+//        property "sonar.sourceEncoding", "UTF-8"
+//        property "sonar.host.url", "http://localhost:9000"
+//        property "sonar.jdbc.url", "jdbc:postgresql://localhost/sonar"
+//        property "sonar.jdbc.driverClassName", "org.postgresql.Driver"
+//        property "sonar.jdbc.username", "sonar"
+//        property "sonar.jdbc.password", "sonar"
+//    }
+//}
+
+// Wrapper task that sets up gradlew script (use ./gradlew in place of gradle command)
+task wrapper(type: Wrapper) {
+    gradleVersion = '1.8'
 }

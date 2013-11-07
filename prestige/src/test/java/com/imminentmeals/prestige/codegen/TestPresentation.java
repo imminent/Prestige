@@ -28,25 +28,6 @@ public class TestPresentation {
     }
 
     @Test
-    public void testPresentationImplementationFailsIfNotActivity() {
-        final JavaFileObject presentation_interface = JavaFileObjects.forResource("PresentationInterface.java");
-        final JavaFileObject presentation = JavaFileObjects.forSourceString("test.NotActivityPresentation", Joiner.on('\n').join(
-                "package test;"
-              , "import com.imminentmeals.prestige.annotations.PresentationImplementation;"
-              , "@PresentationImplementation"
-              , "public class NotActivityPresentation implements PresentationInterface { }"));
-
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(presentation_interface, presentation))
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@PresentationImplementation classes must extend from Activity (%s)."
-                                               , "test.NotActivityPresentation"))
-              .in(presentation_interface)
-              .onLine(6);
-    }
-
-    @Test
     public void testPresentationFailsIfNotInterface() {
         final JavaFileObject presentation = JavaFileObjects.forSourceString("NotInterfacePresentation", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.Presentation;"

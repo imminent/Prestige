@@ -206,30 +206,6 @@ public class TestPresentationFragment {
     }
 
     @Test
-    public void testPresentationFragmentImplementationFailsIfNotFragment() {
-        final JavaFileObject presentation_interface = JavaFileObjects.forResource("PresentationInterface.java");
-        final JavaFileObject presentation_fragment_interface = JavaFileObjects.forResource("PresentationFragmentInterface.java");
-        final JavaFileObject presentation_fragment = JavaFileObjects.forSourceString("test.PresentationFragment_broken"
-                , Joiner.on('\n').join(
-                "package test;"
-                , "import com.imminentmeals.prestige.annotations.PresentationFragmentImplementation;"
-                , "@PresentationFragmentImplementation"
-                , "public class PresentationFragment_broken implements PresentationFragmentInterface { }"));
-
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(
-                      presentation_interface
-                      , presentation_fragment_interface
-                      , presentation_fragment))
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@PresentationFragmentImplementation classes must extend from Fragment (%s)."
-                      , "test.PresentationFragment_broken"))
-              .in(presentation_fragment)
-              .onLine(4);
-    }
-
-    @Test
     public void testPresentationFragmentFailsIfNotInterface() {
         final JavaFileObject presentation_fragment = JavaFileObjects.forSourceString("test.NotInterfacePresentationFragment"
                                                                                    , Joiner.on('\n').join(

@@ -1,10 +1,6 @@
 package com.imminentmeals.prestige.codegen;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.content.Context;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Function;
@@ -109,7 +105,6 @@ import static javax.tools.Diagnostic.Kind.WARNING;
 
 // TODO: can you mandate that a default implementation is provided for everything that has any implementation?
 // TODO: public static Strings for generated methods and classes to use in Prestige helper methods
-// TODO: generate ExclusionPolicy for Model fields to be skipped by Gson
 @SupportedAnnotationTypes({ "com.imminentmeals.prestige.annotations.Presentation",
 	                        "com.imminentmeals.prestige.annotations.PresentationImplementation",
 	                        "com.imminentmeals.prestige.annotations.InjectDataSource",
@@ -262,7 +257,6 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 * @return
 	 */
 	private ImmutableMap<Element, PresentationFragmentData> processPresentationFragments(RoundEnvironment environment) {
-		final TypeMirror fragment_type = _element_utilities.getTypeElement(Fragment.class.getCanonicalName()).asType();
 		final Map<Element, Element> presentation_fragment_protocols = newHashMap();
 		final Map<Element, Element> presentation_fragment_implementations = newHashMap();
 		final Map<Element, Set<Element>> unverified_presentation_fragments = newHashMap();
@@ -343,14 +337,6 @@ public class AnnotationProcessor extends AbstractProcessor {
 					continue;
 				
 				note(implementation_element, "\twith an implementation of " + implementation_element);
-				
-				// Verifies that the Presentation Fragment implementation extends from Fragment
-		        if (!_type_utilities.isSubtype(implementation_element.asType(), fragment_type)) {
-		          error(implementation_element, "@PresentationFragmentImplementation classes must extend from Fragment (%s).",
-		                implementation_element); 
-		          // Skips the current element
-		          continue;
-		        }
 		        
 		        // Finds Presentation Fragment injections and verifies that their Protocols are met
 		        for (Element enclosed_element : implementation_element.getEnclosedElements()) {
@@ -406,7 +392,6 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 */
 	private ImmutableMap<Element, PresentationData> processPresentations(RoundEnvironment environment, 
 			Map<Element, PresentationFragmentData> presentation_fragments) {
-		final TypeMirror activity_type = _element_utilities.getTypeElement(Activity.class.getCanonicalName()).asType();
 		final Map<Element, Element> presentation_protocols = newHashMap();
 		final Map<Element, Element> presentation_implementations = newHashMap();
 					
@@ -470,14 +455,6 @@ public class AnnotationProcessor extends AbstractProcessor {
 					continue;
 				
 				note(element, "\twith an implementation of " + implementation_element);
-				
-				// Verifies that the Presentation implementation extends from Activity
-		        if (!_type_utilities.isSubtype(implementation_element.asType(), activity_type)) {
-		          error(element, "@PresentationImplementation classes must extend from Activity (%s).",
-		                implementation_element);
-		          // Skips the current element
-		          continue;
-		        }
 
                 final TypeMirror presentation_fragment_no_protocol = _element_utilities.getTypeElement(
                         PresentationFragment.NoProtocol.class.getCanonicalName()).asType();
@@ -1454,11 +1431,11 @@ public class AnnotationProcessor extends AbstractProcessor {
                            .emitStatement("_log.tag(_TAG).d(\"Restoring %s from input stream\")", java_writer.compressType(model._implementation + ""))
                            .emitStatement("return (%s) converter.from(input_stream)", java_writer.compressType(model._implementation + ""))
                            .nextControlFlow("else")
-                           .emitStatement("return new %s(%s)", new_instance_format_parameters)
+                           .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
                            .endControlFlow()
                            .nextControlFlow("catch (Exception _)")
                            .emitStatement("_log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model._interface)
-                           .emitStatement("return new %s(%s)", new_instance_format_parameters)
+                           .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
                            .nextControlFlow("finally")
                            .beginControlFlow("if (input_stream != null)")
                            .beginControlFlow("try")
@@ -1481,7 +1458,7 @@ public class AnnotationProcessor extends AbstractProcessor {
                                 , JavaWriter.type(GsonConverter.class, model._implementation + ""), model._implementation)
                         .endMethod();
             } else {
-                java_writer.emitStatement("return new %s(%s)", new_instance_format_parameters)
+                java_writer.emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
                            .endMethod();
             }
         }
@@ -1615,10 +1592,10 @@ public class AnnotationProcessor extends AbstractProcessor {
 		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
 		           .emitPackage(package_name)
 		           .emitEmptyLine()
-		           .emitImports(JavaWriter.type(FragmentManager.class),
-		        		        JavaWriter.type(Fragment.class),
+		           .emitImports("android.app.FragmentManager",
+		        		        "android.app.Fragment",
 		        		        JavaWriter.type(Finder.class),
-		        		        JavaWriter.type(Context.class))
+		        		        "android.content.Context")
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", target)
 		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
