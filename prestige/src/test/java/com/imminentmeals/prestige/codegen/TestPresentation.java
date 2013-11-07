@@ -11,6 +11,9 @@ import javax.tools.JavaFileObject;
 
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FOUR;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SIX;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.THREE;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -41,7 +44,7 @@ public class TestPresentation {
               .withErrorContaining(String.format("@Presentation annotation may only be specified on interfaces (%s)."
                                                , "NotInterfacePresentation"))
               .in(presentation)
-              .onLine(3);
+              .onLine(THREE);
     }
 
     @Test
@@ -58,7 +61,7 @@ public class TestPresentation {
               .withErrorContaining(String.format("@Presentation interface must be public (%s)."
                                                , "PackageProtectedPresentation"))
               .in(presentation)
-              .onLine(3);
+              .onLine(THREE);
 
         presentation = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.Presentation;"
@@ -90,7 +93,7 @@ public class TestPresentation {
               .withErrorContaining(String.format("@Presentation interface must be public (%s)."
                                                , "Test.ProtectedPresentation"))
               .in(presentation)
-              .onLine(4);
+              .onLine(FOUR);
     }
 
     @Test
@@ -183,6 +186,6 @@ public class TestPresentation {
                                                , "test.PresentationFragmentWithProtocolInterface"
                                                , "test.PresentationWithPresentationFragment_broken.presentation_fragment"))
               .in(presentation)
-              .onLine(6);
+              .onLine(SIX);
     }
 }

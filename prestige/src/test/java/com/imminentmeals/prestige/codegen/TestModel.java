@@ -11,6 +11,9 @@ import javax.tools.JavaFileObject;
 
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FOUR;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SEVEN;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.THREE;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -61,7 +64,7 @@ public class TestModel {
                                                + "@PresentationImplementation classes (%s)."
                                                , "test.PresentationWithModel"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -88,7 +91,7 @@ public class TestModel {
                       + "@PresentationFragmentImplementation classes (%s)."
                       , "test.PresentationFragmentWithModel"))
               .in(presentation_fragment)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -112,7 +115,7 @@ public class TestModel {
               .withErrorContaining(String.format("@InjectModel must be a Model (%s)."
                                                , "test.ControllerWithInjectObject.model"))
               .in(controller)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -138,7 +141,7 @@ public class TestModel {
                 .withErrorContaining(String.format("@InjectModel fields must not be private or static (%s)."
                                                  , "test.ControllerWithPrivateModel.model"))
                 .in(controller)
-                .onLine(7);
+                .onLine(SEVEN);
     }
 
     @Test
@@ -164,7 +167,7 @@ public class TestModel {
                 .withErrorContaining(String.format("@InjectModel fields must not be private or static (%s)."
                         , "test.ControllerWithStaticModel.model"))
                 .in(controller)
-                .onLine(7);
+                .onLine(SEVEN);
     }
 
     @Test
@@ -181,7 +184,7 @@ public class TestModel {
               .withErrorContaining(String.format("@Model annotation may only be specified on interfaces (%s)."
                                                , "ClassModel"))
               .in(model)
-              .onLine(3);
+              .onLine(THREE);
     }
 
     @Test
@@ -198,7 +201,7 @@ public class TestModel {
                 .withErrorContaining(String.format("@Model interface must be public (%s)."
                         , "PackageProtectedModel"))
                 .in(model)
-                .onLine(3);
+                .onLine(THREE);
 
         model = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.Model;"
@@ -214,7 +217,7 @@ public class TestModel {
                 .withErrorContaining(String.format("@Model interface must be public (%s)."
                         , "Test.PrivateModel"))
                 .in(model)
-                .onLine(4);
+                .onLine(FOUR);
 
         model = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.Model;"

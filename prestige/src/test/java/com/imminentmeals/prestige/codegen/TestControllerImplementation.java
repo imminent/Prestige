@@ -10,6 +10,7 @@ import javax.tools.JavaFileObject;
 
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.TEST;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SIX;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -37,7 +38,7 @@ public class TestControllerImplementation {
               .withErrorContaining(String.format(
                       "All @ControllerImplementation(\"%s\") must be defined in the same package (%s)."
                     , TEST, "different.DifferentPackageController"))
-              .in(other_controller_interface).onLine(6);
+              .in(other_controller_interface).onLine(SIX);
     }
 
     @Test

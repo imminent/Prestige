@@ -15,6 +15,7 @@ import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.*;
 
 @RunWith(JUnit4.class)
 public class TestController {
@@ -32,7 +33,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller is required to implement Protocol %s by its Presentation (%s)."
                                                , "test.Protocol", "test.PresentationWithProtocolInterface"))
               .in(controller)
-              .onLine(6);
+              .onLine(SIX);
     }
 
     @Test
@@ -135,8 +136,8 @@ public class TestController {
               , "  protected ObjectGraph createObjectGraph() {"
               , "    final List<Object> modules = new ArrayList<Object>();"
               , "    // Controller modules"
-              , "    if (_scope.equals(\"test\")) {"
-              , "      modules.add(new test.TestControllerModule(_log, this));"
+              , "    if (scope.equals(\"test\")) {"
+              , "      modules.add(new test.TestControllerModule(log, this));"
               , "    }"
               , "    return ObjectGraph.create(modules.toArray());"
               , "  }"
@@ -182,7 +183,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller annotation may only be specified on interfaces (%s)."
                                                , "test.NotInterfaceController"))
               .in(controller)
-              .onLine(4);
+              .onLine(FOUR);
     }
 
     @Test
@@ -202,7 +203,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller interface must be public (%s)."
                                                , "test.PackageProtectedController"))
               .in(controller)
-              .onLine(4);
+              .onLine(ProcessorTestUtilities.FOUR);
     }
 
     @Test
@@ -224,7 +225,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller interface must be public (%s)."
                                                , "test.Test.PrivateController"))
               .in(controller)
-              .onLine(5);
+              .onLine(FIVE);
     }
 
     @Test
@@ -254,7 +255,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller Presentation must be an @Presentation (%s)."
                                                , "Test.ExplicitNotAnnotatedPresentation"))
               .in(explicit)
-              .onLine(5);
+              .onLine(FIVE);
 
         ASSERT.about(javaSource())
               .that(implicit)
@@ -263,7 +264,7 @@ public class TestController {
               .withErrorContaining(String.format("No @Presentation-annotated %s found, implicitly required by %s"
                                                , "ImplicitNotAnnotatedPresentation", "Test.ImplicitNotAnnotatedController"))
               .in(implicit)
-              .onLine(5);
+              .onLine(FIVE);
     }
 
     @Test

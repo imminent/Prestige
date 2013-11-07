@@ -36,8 +36,8 @@ public abstract class SegueController {
 
 /* Constructor */
     protected SegueController(String scope, Timber log) {
-        _scope = scope;
-        _log = log;
+        this.scope = scope;
+        this.log = log;
         _controllers = new HashMap<Class<?>, Object>();
         _object_graph = createObjectGraph();
         _object_graph.inject(this);
@@ -57,7 +57,7 @@ public abstract class SegueController {
 /* Public API */
     @SuppressWarnings("unchecked")
     @Nonnull public <T> T dataSource(Class<?> target) {
-        _log.tag(_TAG).d("Injecting " + _controllers.get(target) + " into " + target);
+        log.tag(_TAG).d("Injecting " + _controllers.get(target) + " into " + target);
         return (T) _controllers.get(target);
     }
 
@@ -79,7 +79,7 @@ public abstract class SegueController {
         final Class<?> activity_class = activity.getClass();
         if (!_presentation_controllers.containsKey(activity_class)) return;
 
-        _log.tag(_TAG).d("Vanishing " + _controllers.get(activity_class) + "(for " + activity + ")");
+        log.tag(_TAG).d("Vanishing " + _controllers.get(activity_class) + "(for " + activity + ")");
         _controllers.remove(activity_class);
     }
 
@@ -91,7 +91,7 @@ public abstract class SegueController {
     public void attachPresentationFragment(Activity activity, Object presentation_fragment, String tag) {
         final Object controller = _controllers.get(activity.getClass());
         if (controller != null) {
-            _log.tag(_TAG).d("Attaching " + presentation_fragment + " to " + controller + " (for " + activity + ")");
+            log.tag(_TAG).d("Attaching " + presentation_fragment + " to " + controller + " (for " + activity + ")");
             Prestige.attachPresentationFragment(controller, presentation_fragment, tag);
         }
     }
@@ -100,7 +100,7 @@ public abstract class SegueController {
         final Class<?> activity_class = activity.getClass();
         if (!_controllers.containsKey(activity_class)) return;
 
-        _log.tag(_TAG).d("Registering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
+        log.tag(_TAG).d("Registering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
         controller_bus.register(_controllers.get(activity_class));
     }
 
@@ -108,23 +108,23 @@ public abstract class SegueController {
         final Class<?> activity_class = activity.getClass();
         if (!_controllers.containsKey(activity_class)) return;
 
-        _log.tag(_TAG).d("Unregistering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
+        log.tag(_TAG).d("Unregistering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
         controller_bus.unregister(_controllers.get(activity_class));
     }
 
     @Nonnull public Timber timber() {
-        return _log;
+        return log;
     }
 
     public void storeController(Activity activity) {
         final Class<?> activity_class = activity.getClass();
         if (!_controllers.containsKey(activity_class)) return;
 
-        _log.tag(_TAG).d("Storing controller " + _controllers.get(activity_class) + " (for " + activity + ")");
+        log.tag(_TAG).d("Storing controller " + _controllers.get(activity_class) + " (for " + activity + ")");
         try {
             Prestige.store(_controllers.get(activity_class));
         } catch (IOException exception) {
-            _log.tag(_TAG).d(exception, "Error storing controller" + _controllers.get(activity_class));
+            log.tag(_TAG).d(exception, "Error storing controller" + _controllers.get(activity_class));
         }
     }
 
@@ -137,9 +137,9 @@ public abstract class SegueController {
     }
 
     /**  The current scope */
-    protected final String _scope;
+    protected final String scope;
     /**  Log where messages are written */
-    protected final Timber _log;
+    protected final Timber log;
     /** Dependency injection object graph */
     private final ObjectGraph _object_graph;
     /** Provides the Controller implementation for the given Presentation Implementation */

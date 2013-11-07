@@ -10,6 +10,7 @@ import javax.tools.JavaFileObject;
 
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
 import static com.imminentmeals.prestige.annotations.meta.Implementations.TEST;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SIX;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -34,7 +35,7 @@ public class TestModelImplementation {
                         "All @ModelImplementation(\"%s\") must be defined in the same package (%s)."
                       , TEST, "different.DifferentPackageModel"))
               .in(other_model_interface)
-              .onLine(6);
+              .onLine(SIX);
     }
 
     @Test
