@@ -15,6 +15,7 @@ import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.*;
 
 @RunWith(JUnit4.class)
 public class TestController {
@@ -32,7 +33,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller is required to implement Protocol %s by its Presentation (%s)."
                                                , "test.Protocol", "test.PresentationWithProtocolInterface"))
               .in(controller)
-              .onLine(6);
+              .onLine(SIX);
     }
 
     @Test
@@ -41,7 +42,7 @@ public class TestController {
         final JavaFileObject presentation = JavaFileObjects.forResource("PresentationWithProtocolInterface.java");
         final JavaFileObject controller = JavaFileObjects.forResource("ControllerForPresentationWithProtocolInterface.java");
 
-        final JavaFileObject expected_controller_module = JavaFileObjects.forSourceString("", Joiner.on('\n').join(
+        /*final JavaFileObject expected_controller_module = JavaFileObjects.forSourceString("", Joiner.on('\n').join(
             "// Generated code from Prestige. Do not modify!"
           , "package test;"
           , ""
@@ -52,12 +53,12 @@ public class TestController {
           , "import javax.inject.Named;"
           , "import javax.inject.Singleton;"
           , ""
-          , "/**"
+          , "***"
           , " * <p>Module for injecting:"
           , " * <ul>"
           , " * <li>{@link test.ControllerFoPresentationWithProtocolInterface}</li>"
           , " * </ul></p>"
-          , " */"
+          , " **"
           , "@Module("
           , "  injects = {"
           , "_SegueController.class"
@@ -101,26 +102,26 @@ public class TestController {
               , ""
               , "import static com.imminentmeals.prestige.Prestige._TAG;"
               , ""
-              , "/**"
+              , "***"
               , " * <p>A Segue Controller that handles getting the appropriate Controller"
               , " * for the current Presentation, and communicating with the Controller Bus.</p>"
-              , " */"
+              , " **"
               , "public class _SegueController"
               , "    extends SegueController {"
-              , "  /**"
+              , "  ***"
               , "   * Provider for instances of the {@link test.ControllerFoPresentationWithProtocolInterface} Controller"
-              , "   */"
+              , "   **"
               , "  @Inject"
               , "  Provider<test.ControllerFoPresentationWithProtocolInterface> controller_for_presentation_with_protocol_interface;"
-              , "  /**"
+              , "  ***"
               , "   * Provider for instances of the {@link com.imminentmeals.prestige.GsonProvider} Model"
-              , "   */"
+              , "   **"
               , "  @Inject"
               , "  Lazy<GsonProvider> gson_provider;"
               , ""
-              , "  /**"
+              , "  ***"
               , "   * <p>Constructs a {@link SegueController}.</p>"
-              , "   */"
+              , "   **"
               , "  public _SegueController(String scope, Timber log) {"
               , "    super(scope, log);"
               , "  }"
@@ -135,8 +136,8 @@ public class TestController {
               , "  protected ObjectGraph createObjectGraph() {"
               , "    final List<Object> modules = new ArrayList<Object>();"
               , "    // Controller modules"
-              , "    if (_scope.equals(\"test\")) {"
-              , "      modules.add(new test.TestControllerModule(_log, this));"
+              , "    if (scope.equals(\"test\")) {"
+              , "      modules.add(new test.TestControllerModule(log, this));"
               , "    }"
               , "    return ObjectGraph.create(modules.toArray());"
               , "  }"
@@ -156,7 +157,7 @@ public class TestController {
               , "  }"
               , "}"
               , ""
-        ));
+        ));*/
 
         ASSERT.about(javaSources())
               .that(Arrays.asList(protocol, presentation, controller))
@@ -182,7 +183,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller annotation may only be specified on interfaces (%s)."
                                                , "test.NotInterfaceController"))
               .in(controller)
-              .onLine(4);
+              .onLine(FOUR);
     }
 
     @Test
@@ -202,7 +203,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller interface must be public (%s)."
                                                , "test.PackageProtectedController"))
               .in(controller)
-              .onLine(4);
+              .onLine(ProcessorTestUtilities.FOUR);
     }
 
     @Test
@@ -224,7 +225,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller interface must be public (%s)."
                                                , "test.Test.PrivateController"))
               .in(controller)
-              .onLine(5);
+              .onLine(FIVE);
     }
 
     @Test
@@ -254,7 +255,7 @@ public class TestController {
               .withErrorContaining(String.format("@Controller Presentation must be an @Presentation (%s)."
                                                , "Test.ExplicitNotAnnotatedPresentation"))
               .in(explicit)
-              .onLine(5);
+              .onLine(FIVE);
 
         ASSERT.about(javaSource())
               .that(implicit)
@@ -263,7 +264,7 @@ public class TestController {
               .withErrorContaining(String.format("No @Presentation-annotated %s found, implicitly required by %s"
                                                , "ImplicitNotAnnotatedPresentation", "Test.ImplicitNotAnnotatedController"))
               .in(implicit)
-              .onLine(5);
+              .onLine(FIVE);
     }
 
     @Test

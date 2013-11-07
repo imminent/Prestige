@@ -11,6 +11,10 @@ import javax.tools.JavaFileObject;
 
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FIVE;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FOUR;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SEVEN;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.THREE;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -116,7 +120,7 @@ public class TestPresentationFragment {
                                   + "or @ControllerImplementation classes (%s)."
                                   , "test.NotAnnotatedClass.presentation_fragment"))
               .in(container)
-              .onLine(5);
+              .onLine(FIVE);
     }
 
     @Test
@@ -140,7 +144,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@InjectPresentationFragment must be a @PresentationFragment (%s)"
                                                , "test.PresentationWithPresentationFragment_broken.presentation_fragment"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -171,7 +175,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@InjectPresentationFragment fields must not be private or static (%s)."
                                                , "test.PresentationWithPrivatePresentationFragment.presentation_fragment"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -202,7 +206,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@InjectPresentationFragment fields must not be private or static (%s)."
                       , "test.PresentationWithStaticPresentationFragment.presentation_fragment"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -221,7 +225,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@PresentationFragment annotation may only be specified on interfaces (%s)."
                                                , "test.NotInterfacePresentationFragment"))
               .in(presentation_fragment)
-              .onLine(4);
+              .onLine(FOUR);
     }
 
     @Test
@@ -239,7 +243,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@PresentationFragment interfaces must be public (%s)."
                                                , "PackageProtectedPresentationFragment"))
               .in(presentation_fragment)
-              .onLine(3);
+              .onLine(THREE);
 
         presentation_fragment = JavaFileObjects.forSourceString("Test"
                                                               , Joiner.on('\n').join(
@@ -256,7 +260,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@PresentationFragment interfaces must be public (%s)."
                                                , "Test.PrivatePresentationFragment"))
               .in(presentation_fragment)
-              .onLine(4);
+              .onLine(FOUR);
 
         presentation_fragment = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.PresentationFragment;"
@@ -272,7 +276,7 @@ public class TestPresentationFragment {
                 .withErrorContaining(String.format("@PresentationFragment interfaces must be public (%s)."
                         , "Test.ProtectedPresentationFragment"))
                 .in(presentation_fragment)
-                .onLine(4);
+                .onLine(FOUR);
     }
 
     @Test
@@ -293,7 +297,7 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@PresentationFragment Protocol must be an interface (%s)."
                                                , "NotClassProtocol"))
               .in(presentation_fragment)
-              .onLine(4);
+              .onLine(FOUR);
     }
 
     @Test
@@ -314,7 +318,7 @@ public class TestPresentationFragment {
                 .withErrorContaining(String.format("@PresentationFragment Protocol must be public (%s)."
                                                  , "PackageProtectedProtocol"))
                 .in(presentation_fragment)
-                .onLine(3);
+                .onLine(THREE);
 
         protocol = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.PresentationFragment;"
@@ -331,7 +335,7 @@ public class TestPresentationFragment {
                 .withErrorContaining(String.format("@PresentationFragment Protocol must be public (%s)."
                         , "Test.PrivateProtocol"))
                 .in(protocol)
-                .onLine(5);
+                .onLine(FIVE);
 
         protocol = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "public class Test {"
@@ -347,6 +351,6 @@ public class TestPresentationFragment {
               .withErrorContaining(String.format("@PresentationFragment Protocol must be public (%s)."
                                                , "Test.ProtectedProtocol"))
               .in(presentation_fragment)
-              .onLine(3);
+              .onLine(THREE);
     }
 }

@@ -10,6 +10,7 @@ import java.util.Arrays;
 import javax.tools.JavaFileObject;
 
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SEVEN;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -37,7 +38,7 @@ public class TestDataSource {
               .withErrorContaining(String.format("@InjectDataSource fields must be the same as the Presentation's Protocol, which is %s (%s)."
                       , "test.Protocol", "test.NonProtocolDataSourcePresentation.data_source"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -64,7 +65,7 @@ public class TestDataSource {
                                                  + "which is %s (%s)."
                                                  , "test.OtherProtocol", "test.NonProtocolDataSourcePresentationFragment.data_source"))
                 .in(presentation_fragment)
-                .onLine(7);
+                .onLine(SEVEN);
     }
 
     @Test
@@ -180,7 +181,7 @@ public class TestDataSource {
               .withErrorContaining(String.format("@InjectDataSource fields must not be private or static (%s)."
                                                , "test.PresentationWithPrivateDataSource.data_source"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -206,7 +207,7 @@ public class TestDataSource {
                 .withErrorContaining(String.format("@InjectDataSource fields must not be private or static (%s)."
                         , "test.PresentationFragmentWithPrivateDataSource.data_source"))
                 .in(presentation_fragment)
-                .onLine(7);
+                .onLine(SEVEN);
     }
 
     @Test
@@ -232,7 +233,7 @@ public class TestDataSource {
               .withErrorContaining(String.format("@InjectDataSource fields must not be private or static (%s)."
                       , "test.PresentationWithStaticDataSource.data_source"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -258,7 +259,7 @@ public class TestDataSource {
               .withErrorContaining(String.format("@InjectDataSource fields must not be private or static (%s)."
                       , "test.PresentationFragmentWithStaticDataSource.data_source"))
               .in(presentation_fragment)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -285,7 +286,7 @@ public class TestDataSource {
                                                + " that have a Protocol (%s)."
                                                , "test.PresentationWithoutProtocolDataSource"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test
@@ -312,6 +313,6 @@ public class TestDataSource {
                                                + " that have a Protocol (%s)."
                                                , "test.PresentationFragmentWithoutProtocolDataSource"))
               .in(presentation_fragment)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 }

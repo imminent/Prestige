@@ -228,8 +228,8 @@ public class AnnotationProcessor extends AbstractProcessor {
         final Map<String, Map<Element, ModelData>> model_implementations = newHashMap();
         final int number_of_scopes = models.size();
         for (Entry<String, List<ModelData>> entry : models.entrySet()) {
-            Map<Element, ModelData> scoped_models;
-            if ((scoped_models = model_implementations.get(entry.getKey())) == null) {
+            Map<Element, ModelData> scoped_models = model_implementations.get(entry.getKey());
+            if (scoped_models == null) {
                 scoped_models = newHashMapWithExpectedSize(number_of_scopes);
                 model_implementations.put(entry.getKey(), scoped_models);
             }
@@ -380,7 +380,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		return ImmutableMap.copyOf(transformEntries(presentation_fragment_protocols,
 				new EntryTransformer<Element, Element, PresentationFragmentData>() {
 
-					public PresentationFragmentData transformEntry(@Nonnull Element key, @Nullable Element protocol) { return new PresentationFragmentData(protocol == null? _type_utilities.asElement(no_protocol) : protocol
+					public PresentationFragmentData transformEntry(@Nullable Element key, @Nullable Element protocol) { return new PresentationFragmentData(protocol == null? _type_utilities.asElement(no_protocol) : protocol
                                                                                           , presentation_fragment_implementations.get(key)); }
 			
 		}));
@@ -1128,7 +1128,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 
             nested_if_else_if = "if";
             java_writer.beginControlFlow(String.format("%s (object instanceof %s)", if_else_if_control, model._interface))
-                       .emitStatement("_log.tag(_TAG).d(\"Storing \" + object)")
+                       .emitStatement("log.tag(_TAG).d(\"Storing \" + object)")
                        .emitStatement("%s%s.get().toStream(object, gson_provider.get().outputStreamFor(%s.class))"
                                , model._variable_name, _CONVERTOR, model._interface);
 
@@ -1139,7 +1139,7 @@ public class AnnotationProcessor extends AbstractProcessor {
                     model_implementation = model_implementations.containsKey(PRODUCTION)? model_implementations.get(PRODUCTION).get(model._interface) : null;
                 if (model_implementation == null || !model_implementation._should_serialize || model_implementation._parameters == null) continue;
 
-                java_writer.beginControlFlow(String.format("%s (_scope.equals(\"%s\"))", nested_if_else_if, entry.getKey()));
+                java_writer.beginControlFlow(String.format("%s (scope.equals(\"%s\"))", nested_if_else_if, entry.getKey()));
                 for (Element parameter : model_implementation._parameters) {
                     final ModelData sub_model = element_to_model_interfaces.get(_type_utilities.asElement(parameter.asType()));
                     // This should never actually occur without error in Annotation Processor
@@ -1187,7 +1187,7 @@ public class AnnotationProcessor extends AbstractProcessor {
                 if (controller_module._scope.equals(Implementations.PRODUCTION)) {
                     production_module = String.format(Locale.US, "modules.add(new %s())", controller_module._qualified_name);
                 } else {
-                    java_writer.beginControlFlow(String.format(Locale.US, "%s (_scope.equals(\"%s\"))"
+                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
                             , if_else_if_control, controller_module._scope))
                             .emitStatement("modules.add(new %s())", controller_module._qualified_name)
                             .endControlFlow();
@@ -1201,11 +1201,11 @@ public class AnnotationProcessor extends AbstractProcessor {
             String production_module = null;
             for (ModuleData model_module : model_modules)
                 if (model_module._scope.equals(Implementations.PRODUCTION)) {
-                    production_module = String.format(Locale.US, "modules.add(new %s(_log, this))", model_module._qualified_name);
+                    production_module = String.format(Locale.US, "modules.add(new %s(log, this))", model_module._qualified_name);
                 } else {
-                    java_writer.beginControlFlow(String.format(Locale.US, "%s (_scope.equals(\"%s\"))"
+                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
                             , if_else_if_control, model_module._scope))
-                            .emitStatement("modules.add(new %s(_log, this))", model_module._qualified_name)
+                            .emitStatement("modules.add(new %s(log, this))", model_module._qualified_name)
                             .endControlFlow();
                     if_else_if_control = else_if;
                 }
@@ -1379,7 +1379,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 				   .emitEmptyLine()
                    .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log"
                               , JavaWriter.type(SegueController.class), "segue_controller")
-                   .emitStatement("_log = log")
+                   .emitStatement("this.log = log")
                    .emitStatement("_segue_controller = segue_controller")
                    .endMethod()
                    .emitEmptyLine()
@@ -1428,13 +1428,13 @@ public class AnnotationProcessor extends AbstractProcessor {
                            .beginControlFlow(String.format("if (!_%s%s)", model._variable_name, file_tested))
                            .emitStatement("_%s%s = true", model._variable_name, file_tested)
                            .emitStatement("input_stream = gson_provider.inputStreamFor(%s.class)", model._interface)
-                           .emitStatement("_log.tag(_TAG).d(\"Restoring %s from input stream\")", java_writer.compressType(model._implementation + ""))
+                           .emitStatement("log.tag(_TAG).d(\"Restoring %s from input stream\")", java_writer.compressType(model._implementation + ""))
                            .emitStatement("return (%s) converter.from(input_stream)", java_writer.compressType(model._implementation + ""))
                            .nextControlFlow("else")
                            .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
                            .endControlFlow()
                            .nextControlFlow("catch (Exception _)")
-                           .emitStatement("_log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model._interface)
+                           .emitStatement("log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model._interface)
                            .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
                            .nextControlFlow("finally")
                            .beginControlFlow("if (input_stream != null)")
@@ -1491,7 +1491,7 @@ public class AnnotationProcessor extends AbstractProcessor {
                    .endMethod()
                    .emitEmptyLine()
                    .emitJavadoc("Log where messages are written")
-                   .emitField(JavaWriter.type(Timber.class), "_log", private_final)
+                   .emitField(JavaWriter.type(Timber.class), "log", private_final)
                    .emitField(JavaWriter.type(String.class), "_TAG", EnumSet.of(PRIVATE, STATIC, FINAL), stringLiteral("Prestige"))
                    .emitJavadoc("Segue Controller")
                    .emitField(JavaWriter.type(SegueController.class), "_segue_controller", private_final);
@@ -1601,14 +1601,14 @@ public class AnnotationProcessor extends AbstractProcessor {
 		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
 		           .emitEmptyLine()
 		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
-		                        "@param finder The finder that specifies how to retrieve the context\n" +
-		        		        "@param display The current display state\n" +
-		        		        "@param target The target of the injection", target)
-		           .beginMethod("void", "injectPresentationFragments", 
-		        		        EnumSet.of(PUBLIC, STATIC),
-		        		        JavaWriter.type(Finder.class), "finder",
-		        		        JavaWriter.type(int.class), "display",
-		        		        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
+                           "@param finder The finder that specifies how to retrieve the context\n" +
+                           "@param display The current display state\n" +
+                           "@param target The target of the injection", target)
+		           .beginMethod("void", "injectPresentationFragments",
+                           EnumSet.of(PUBLIC, STATIC),
+                           JavaWriter.type(Finder.class), "finder",
+                           JavaWriter.type(int.class), "display",
+                           processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
 		if (!injections.isEmpty()) {
 			java_writer.emitStatement("final Context context = finder.findContext(target)")
 			           .emitStatement("final FragmentManager fragment_manager = finder.findFragmentManager(target)")
