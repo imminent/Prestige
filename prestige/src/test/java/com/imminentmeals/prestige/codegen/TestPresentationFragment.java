@@ -13,8 +13,10 @@ import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FIVE;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FOUR;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.ONE;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SEVEN;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.THREE;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.TWO;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
 
@@ -296,8 +298,8 @@ public class TestPresentationFragment {
               .failsToCompile()
               .withErrorContaining(String.format("@PresentationFragment Protocol must be an interface (%s)."
                                                , "NotClassProtocol"))
-              .in(presentation_fragment)
-              .onLine(FOUR);
+              .in(protocol)
+              .onLine(ONE);
     }
 
     @Test
@@ -317,8 +319,8 @@ public class TestPresentationFragment {
                 .failsToCompile()
                 .withErrorContaining(String.format("@PresentationFragment Protocol must be public (%s)."
                                                  , "PackageProtectedProtocol"))
-                .in(presentation_fragment)
-                .onLine(THREE);
+                .in(protocol)
+                .onLine(ONE);
 
         protocol = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.PresentationFragment;"
@@ -335,7 +337,7 @@ public class TestPresentationFragment {
                 .withErrorContaining(String.format("@PresentationFragment Protocol must be public (%s)."
                         , "Test.PrivateProtocol"))
                 .in(protocol)
-                .onLine(FIVE);
+                .onLine(THREE);
 
         protocol = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "public class Test {"
@@ -350,7 +352,7 @@ public class TestPresentationFragment {
               .failsToCompile()
               .withErrorContaining(String.format("@PresentationFragment Protocol must be public (%s)."
                                                , "Test.ProtectedProtocol"))
-              .in(presentation_fragment)
-              .onLine(THREE);
+              .in(protocol)
+              .onLine(TWO);
     }
 }

@@ -1,4 +1,5 @@
 //apply plugin: 'sonar-runner'
+apply plugin: 'idea'
 
 def isReleaseBuild() {
     return version.contains("SNAPSHOT") == false
