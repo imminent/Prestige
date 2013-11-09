@@ -9,6 +9,8 @@ import javax.annotation.processing.Processor;
  * @author Dandré
  */
 /* package */final class ProcessorTestUtilities {
+    /* package */static final int ONE = 1;
+    /* package */static final int TWO = 2;
     /* package */static final int THREE = 3;
     /* package */static final int FOUR = 4;
     /* package */static final int FIVE = 5;

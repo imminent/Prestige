@@ -15,14 +15,13 @@
  */
 package com.imminentmeals.prestige.example.models.implementations;
 
-import static com.imminentmeals.prestige.annotations.meta.Implementations.DEVELOPMENT;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
-
 import com.imminentmeals.prestige.annotations.ModelImplementation;
 import com.imminentmeals.prestige.example.models.NewsCategory;
 import com.imminentmeals.prestige.example.models.NewsSource;
+import javax.annotation.Nonnegative;
+import javax.annotation.Nonnull;
+
+import static com.imminentmeals.prestige.annotations.meta.Implementations.DEVELOPMENT;
 
 /**
  * Source of strange and wonderful news.
@@ -30,29 +29,26 @@ import com.imminentmeals.prestige.example.models.NewsSource;
  * This singleton functions as the repository for the news we display.
  */
 @ModelImplementation(DEVELOPMENT)
-@Singleton
 public class FakeNewsSource implements NewsSource {
-    // the category names
-    final String[] CATEGORIES = { "Top Stories", "US", "Politics", "Economy" };
 
-    // category objects, representing each category
-    NewsCategory[] category;
+  /* package */FakeNewsSource() {
+    _category = new NewsCategory[_CATEGORIES.length];
+    for (int i = 0; i < _CATEGORIES.length; i++) _category[i] = new NewsCategory();
+  }
 
-    @Inject
-    /* package */FakeNewsSource() {
-        int i;
-        category = new NewsCategory[CATEGORIES.length];
-        for (i = 0; i < CATEGORIES.length; i++)
-            category[i] = new NewsCategory();
-    }
+  @Override
+  @Nonnull public String[] categories() {
+    return _CATEGORIES;
+  }
 
-    @Override
-    public String[] categories() {
-        return CATEGORIES;
-    }
+  @Override
+  @Nonnull public NewsCategory categoryForIndex(@Nonnegative int index) {
+    return _category[index];
+  }
 
-    @Override
-    public NewsCategory categoryForIndex(int index) {
-        return category[index];
-    }
+
+  // category objects, representing each category
+  private NewsCategory[] _category;
+  // the category names
+  private static final String[] _CATEGORIES = {"Top Stories", "US", "Politics", "Economy"};
 }

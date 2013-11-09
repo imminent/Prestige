@@ -42,7 +42,7 @@ public class TestController {
         final JavaFileObject presentation = JavaFileObjects.forResource("PresentationWithProtocolInterface.java");
         final JavaFileObject controller = JavaFileObjects.forResource("ControllerForPresentationWithProtocolInterface.java");
 
-        final JavaFileObject expected_controller_module = JavaFileObjects.forSourceString("", Joiner.on('\n').join(
+        /*final JavaFileObject expected_controller_module = JavaFileObjects.forSourceString("", Joiner.on('\n').join(
             "// Generated code from Prestige. Do not modify!"
           , "package test;"
           , ""
@@ -53,12 +53,12 @@ public class TestController {
           , "import javax.inject.Named;"
           , "import javax.inject.Singleton;"
           , ""
-          , "/**"
+          , "***"
           , " * <p>Module for injecting:"
           , " * <ul>"
           , " * <li>{@link test.ControllerFoPresentationWithProtocolInterface}</li>"
           , " * </ul></p>"
-          , " */"
+          , " **"
           , "@Module("
           , "  injects = {"
           , "_SegueController.class"
@@ -102,26 +102,26 @@ public class TestController {
               , ""
               , "import static com.imminentmeals.prestige.Prestige._TAG;"
               , ""
-              , "/**"
+              , "***"
               , " * <p>A Segue Controller that handles getting the appropriate Controller"
               , " * for the current Presentation, and communicating with the Controller Bus.</p>"
-              , " */"
+              , " **"
               , "public class _SegueController"
               , "    extends SegueController {"
-              , "  /**"
+              , "  ***"
               , "   * Provider for instances of the {@link test.ControllerFoPresentationWithProtocolInterface} Controller"
-              , "   */"
+              , "   **"
               , "  @Inject"
               , "  Provider<test.ControllerFoPresentationWithProtocolInterface> controller_for_presentation_with_protocol_interface;"
-              , "  /**"
+              , "  ***"
               , "   * Provider for instances of the {@link com.imminentmeals.prestige.GsonProvider} Model"
-              , "   */"
+              , "   **"
               , "  @Inject"
               , "  Lazy<GsonProvider> gson_provider;"
               , ""
-              , "  /**"
+              , "  ***"
               , "   * <p>Constructs a {@link SegueController}.</p>"
-              , "   */"
+              , "   **"
               , "  public _SegueController(String scope, Timber log) {"
               , "    super(scope, log);"
               , "  }"
@@ -157,7 +157,7 @@ public class TestController {
               , "  }"
               , "}"
               , ""
-        ));
+        ));*/
 
         ASSERT.about(javaSources())
               .that(Arrays.asList(protocol, presentation, controller))

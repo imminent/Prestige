@@ -77,7 +77,7 @@ public class TestPresentation {
               .withErrorContaining(String.format("@Presentation interface must be public (%s)."
                                                , "Test.PrivatePresentation"))
               .in(presentation)
-              .onLine(4);
+              .onLine(FOUR);
 
         presentation = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
                 "import com.imminentmeals.prestige.annotations.Presentation;"

@@ -181,7 +181,7 @@ public class TestDataSource {
               .withErrorContaining(String.format("@InjectDataSource fields must not be private or static (%s)."
                                                , "test.PresentationWithPrivateDataSource.data_source"))
               .in(presentation)
-              .onLine(7);
+              .onLine(SEVEN);
     }
 
     @Test

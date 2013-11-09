@@ -233,6 +233,6 @@ public class TestModel {
                 .withErrorContaining(String.format("@Model interface must be public (%s)."
                         , "Test.PrivateModel"))
                 .in(model)
-                .onLine(4);
+                .onLine(FOUR);
     }
 }

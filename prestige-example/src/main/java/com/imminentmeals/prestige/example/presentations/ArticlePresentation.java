@@ -9,6 +9,7 @@ import com.imminentmeals.prestige.example.models.NewsArticle;
  */
 @Presentation
 public interface ArticlePresentation {
+
 	void displayArticle(NewsArticle article);
 
 	void stop();

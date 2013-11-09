@@ -90,7 +90,7 @@ public final class Prestige {
 	 * @return The Segue Controller
 	 */
 	public static void conjureSegueController(String scope, Timber log) {
-        // TODO: throw error to crash at runtime (messages get lost in the swarm of logs anyways)
+    // TODO: throw error to crash at runtime (messages get lost in the swarm of logs anyways)
 		try {
 			final Class<?> segue_controller = Class.forName("com.imminentmeals.prestige._SegueController");
 			_segue_controller = (SegueController) segue_controller.getConstructor(String.class, Timber.class)
@@ -113,7 +113,7 @@ public final class Prestige {
 		}
 	}
 
-    /**
+  /**
 	 * <p>Destroys the constructed Controller for the given {@link Activity}.</p>
 	 * @param activity The given Activity
 	 */
@@ -145,6 +145,7 @@ public final class Prestige {
 	 */
     @TargetApi(ICE_CREAM_SANDWICH)
 	public static ActivityLifecycleCallbacks activityLifecycleCallbacks() {
+        // TODO: move to constant field
 		return new ActivityLifecycleCallbacks() {
 			
 			@Override

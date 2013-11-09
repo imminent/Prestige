@@ -20,16 +20,20 @@ public class TestControllerImplementation {
     @Test
     public void sameScopeControllerImplementationsFailsIfInDifferentPackage() {
         final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
+        final JavaFileObject presentation_implementation = JavaFileObjects.forResource("TestPresentation.java");
         final JavaFileObject controller_interface = JavaFileObjects.forResource("ControllerInterface.java");
         final JavaFileObject controller = JavaFileObjects.forResource("TestController.java");
-        final JavaFileObject other_presentation = JavaFileObjects.forResource("DifferentPackagePresentationInterface.java");
+        final JavaFileObject other_presentation_interface = JavaFileObjects.forResource("DifferentPackagePresentationInterface.java");
+        final JavaFileObject other_presentation = JavaFileObjects.forResource("DifferentPackagePresentation.java");
         final JavaFileObject other_controller_interface = JavaFileObjects.forResource("DifferentPackageControllerInterface.java");
         final JavaFileObject other_controller = JavaFileObjects.forResource("DifferentPackageController.java");
 
         ASSERT.about(javaSources())
               .that(Arrays.asList(presentation
+                                , presentation_implementation
                                 , controller_interface
                                 , controller
+                                , other_presentation_interface
                                 , other_presentation
                                 , other_controller_interface
                                 , other_controller))
