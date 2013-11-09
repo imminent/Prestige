@@ -12,14 +12,14 @@ public interface Messages {
 	public interface ArticlePresentation {
 		
 		@Subscribe
-		void willCreatePresentation(WillCreatePresentation message);
+		void willShowPresentation(WillShowPresentation message);
 		
-		public static class WillCreatePresentation {
+		public static class WillShowPresentation {
 			public final boolean has_two_panes;
 			public final int category_index;
 			public final int article_index;
 			
-			public WillCreatePresentation(boolean has_two_panes, int category_index, int article_index) {
+			public WillShowPresentation(boolean has_two_panes, int category_index, int article_index) {
 				this.has_two_panes = has_two_panes;
 				this.category_index = category_index;
 				this.article_index = article_index;
@@ -30,7 +30,7 @@ public interface Messages {
 	public interface NewsReaderPresentation {
 		
 		@Subscribe 
-		void willCreatePresentation(WillCreatePresentation message);
+		void willShowPresentation(WillShowPresentation message);
 		@Subscribe 
 		void willRestorePresentation(WillRestorePresentation message);
 		@Subscribe 
@@ -40,11 +40,11 @@ public interface Messages {
 		@Subscribe 
 		void onHeadlineSelected(HeadlineSelected message);
 		
-		public static class WillCreatePresentation {
+		public static class WillShowPresentation {
 			public final boolean has_two_panes;
 			public final int category_index;
 			
-			public WillCreatePresentation(boolean has_two_panes, int category_index) {
+			public WillShowPresentation(boolean has_two_panes, int category_index) {
 				this.has_two_panes = has_two_panes;
 				this.category_index = category_index;
 			}

@@ -22,40 +22,54 @@ package com.imminentmeals.prestige.example.models;
  * generated nonsense.
  */
 public class NewsArticle {
-    // How many sentences in each paragraph?
-    final int SENTENCES_PER_PARAGRAPH = 20;
 
-    // How many paragraphs in each article?
-    final int PARAGRAPHS_PER_ARTICLE = 5;
+  /**
+   * Create a news article with randomly generated text.
+   *
+   * @param nonsense_generator the nonsense generator to use.
+   */
+  public NewsArticle(NonsenseGenerator nonsense_generator) {
+    _headline = nonsense_generator.makeHeadline();
 
-    // Headline and body
-    String mHeadline, mBody;
+    final StringBuilder string_builder = stringBuilder();
+    string_builder.append(_ARTICLE_OPENER);
+    string_builder.append(_HEADER_OPENER).append(_headline).append(_HEADER_CLOSER);
+    for (int i = 0; i < _PARAGRAPHS_PER_ARTICLE; i++)
+      string_builder.append(_PARAGRAPH_OPENER)
+                    .append(nonsense_generator.makeText(_SENTENCES_PER_PARAGRAPH))
+                    .append(_PARAGRAPH_CLOSER);
 
-    /**
-     * Create a news article with randomly generated text.
-     * @param nonsense_generator the nonsense generator to use.
-     */
-    public NewsArticle(NonsenseGenerator nonsense_generator) {
-        mHeadline = nonsense_generator.makeHeadline();
+    string_builder.append(_ARTICLE_CLOSER);
+    _body = string_builder.toString();
+    string_builder.setLength(0);
+  }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("<html><body>");
-        sb.append("<h1>" + mHeadline + "</h1>");
-        int i;
-        for (i = 0; i < PARAGRAPHS_PER_ARTICLE; i++)
-            sb.append("<p>").append(nonsense_generator.makeText(SENTENCES_PER_PARAGRAPH)).append("</p>");
+  /** Returns the headline. */
+  public String getHeadline() {
+    return _headline;
+  }
 
-        sb.append("</body></html>");
-        mBody = sb.toString();
-    }
+  /** Returns the article body (HTML) */
+  public String getBody() {
+    return _body;
+  }
 
-    /** Returns the headline. */
-    public String getHeadline() {
-        return mHeadline;
-    }
+  private static StringBuilder stringBuilder() {
+    if (_string_builder.get() == null) _string_builder.set(new StringBuilder());
+    return _string_builder.get();
+  }
 
-    /** Returns the article body (HTML)*/
-    public String getBody() {
-        return mBody;
-    }
+  // Headline and body
+  private String _headline, _body;
+  // How many sentences in each paragraph?
+  private static final int _SENTENCES_PER_PARAGRAPH = 20;
+  // How many paragraphs in each article?
+  private static final int _PARAGRAPHS_PER_ARTICLE = 5;
+  private static final ThreadLocal<StringBuilder> _string_builder = new ThreadLocal<>();
+  private static final String _ARTICLE_OPENER = "<html><body>";
+  private static final String _ARTICLE_CLOSER = "</body></html>";
+  private static final String _HEADER_OPENER = "<h1>";
+  private static final String _HEADER_CLOSER = "</h1>";
+  private static final String _PARAGRAPH_OPENER = "<p>";
+  private static final String _PARAGRAPH_CLOSER = "</p>";
 }

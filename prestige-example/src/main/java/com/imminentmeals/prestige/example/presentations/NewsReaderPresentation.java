@@ -4,11 +4,13 @@ import com.imminentmeals.prestige.annotations.Presentation;
 import com.imminentmeals.prestige.example.models.NewsArticle;
 import com.imminentmeals.prestige.example.models.NewsCategory;
 import com.imminentmeals.prestige.example.presentations.protocols.NewsReaderProtocol;
+import javax.annotation.ParametersAreNonnullByDefault;
 
 /**
  *
  * @author Dandre Allison
  */
+@ParametersAreNonnullByDefault
 @Presentation(protocol = NewsReaderProtocol.class)
 public interface NewsReaderPresentation {
 
