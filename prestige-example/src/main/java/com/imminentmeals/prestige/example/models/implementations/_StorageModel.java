@@ -8,10 +8,9 @@ import javax.annotation.ParametersAreNonnullByDefault;
 
 @ParametersAreNonnullByDefault
 @ModelImplementation(serialize = false)
-public class _StorageModel implements StorageModel {
+/* package */class _StorageModel implements StorageModel {
 
-  @Override
-  public void selfStorageFacility(SelfStorageFacility facility) {
+  @Override public void selfStorageFacility(SelfStorageFacility facility) {
     _facility = facility;
   }
 

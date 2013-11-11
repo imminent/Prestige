@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.imminentmeals.prestige.example.models.implementations;
+package com.imminentmeals.prestige.example.models.fake_models;
 
 import com.imminentmeals.prestige.annotations.ModelImplementation;
 import com.imminentmeals.prestige.example.models.NewsCategory;
@@ -31,7 +31,7 @@ import static com.imminentmeals.prestige.annotations.meta.Implementations.DEVELO
 @ModelImplementation(DEVELOPMENT)
 public class FakeNewsSource implements NewsSource {
 
-  /* package */FakeNewsSource() {
+  public FakeNewsSource() {
     _category = new NewsCategory[_CATEGORIES.length];
     for (int i = 0; i < _CATEGORIES.length; i++) _category[i] = new NewsCategory();
   }
