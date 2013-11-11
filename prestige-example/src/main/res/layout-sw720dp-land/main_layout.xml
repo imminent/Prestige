@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (C) 2011 The Android Open Source Project
+<?xml version="1.0" encoding="utf-8"?><!-- Copyright (C) 2011 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
      you may not use this file except in compliance with the License.
@@ -19,14 +18,17 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:orientation="horizontal">
-    <fragment android:id="@+id/headlines"
-              android:layout_height="fill_parent"
-              android:name="com.imminentmeals.prestige.example.presentations.framework.HeadlinesFragment"
-              android:layout_width="400dp"
-              android:layout_marginRight="10dp"/>
-    <fragment android:id="@+id/article"
-              android:layout_height="fill_parent"
-              android:name="com.imminentmeals.prestige.example.presentations.framework.ArticleFragment"
-              android:layout_width="fill_parent" />
-</LinearLayout>
-<!-- END_INCLUDE(all) -->
+
+    <fragment
+        android:id="@+id/headlines"
+        android:layout_height="fill_parent"
+        android:name="com.imminentmeals.prestige.example.presentations.framework.HeadlinesFragment"
+        android:layout_width="400dp"
+        android:layout_marginRight="10dp" />
+
+    <fragment
+        android:id="@+id/article"
+        android:layout_height="fill_parent"
+        android:name="com.imminentmeals.prestige.example.presentations.framework.ArticleFragment"
+        android:layout_width="fill_parent" />
+</LinearLayout><!-- END_INCLUDE(all) -->

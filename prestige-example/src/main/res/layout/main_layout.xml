@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (C) 2011 The Android Open Source Project
+<?xml version="1.0" encoding="utf-8"?><!-- Copyright (C) 2011 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
      you may not use this file except in compliance with the License.
@@ -15,7 +14,14 @@
 -->
 
 <!-- BEGIN_INCLUDE(all) -->
-<resources>
-    <bool name="has_two_panes">true</bool>
-</resources>
-<!-- END_INCLUDE(all) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <fragment
+        android:id="@+id/headlines"
+        android:layout_height="fill_parent"
+        android:layout_width="match_parent"
+        android:name="com.imminentmeals.prestige.example.presentations.framework.HeadlinesFragment" />
+</LinearLayout><!-- END_INCLUDE(all) -->
