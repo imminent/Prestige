@@ -22,6 +22,7 @@ import timber.log.Timber;
 import static android.os.Build.VERSION_CODES.HONEYCOMB;
 import static android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH;
 import static com.google.common.collect.Maps.newHashMap;
+import static java.lang.String.format;
 
 /**
  * TODO: can I use interfaces to make this generally applicable to Java while working in an Android environment?
@@ -29,15 +30,17 @@ import static com.google.common.collect.Maps.newHashMap;
  */
 @ParametersAreNonnullByDefault
 public final class Prestige {
-	
-	/**
+
+  private static final String _UNABLE_TO_INJECT_DATA_SOURCE_FOR =
+      "Unable to inject Data Source for ";
+
+  /**
 	 * <p>Injects a Data Source into the given {@link Activity}.</p>
 	 * @param activity The target of the injection
 	 */
 	public static void conjureController(Activity activity) {
         if (_segue_controller == null)
-            throw new IllegalStateException("Attempting to create controller before Segue Controller was created " +
-                    "(Prestige.conjureSegueController(String)).");
+            throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "create controller"));
 		// Creates Controller
         _segue_controller.createController(activity);
 		injectDataSource(Finder.ACTIVITY, activity);
@@ -66,8 +69,7 @@ public final class Prestige {
 	 */
 	public static void sendMessage(Object message) {
 		if (_segue_controller == null)
-			throw new IllegalStateException("Attempting to send message before Segue Controller was created " +
-					"(Prestige.conjureSegueController(String)).");
+			throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "send message"));
         _segue_controller.timber().tag(_TAG).d("Sending message to controller: " + message);
 		_segue_controller.sendMessage(message);
 	}
@@ -95,19 +97,12 @@ public final class Prestige {
 			final Class<?> segue_controller = Class.forName("com.imminentmeals.prestige._SegueController");
 			_segue_controller = (SegueController) segue_controller.getConstructor(String.class, Timber.class)
                                                                   .newInstance(scope, log);
-		} catch (IllegalArgumentException exception) {
-            logProblemWithSetup(exception, log);
-		} catch (SecurityException exception) {
-            logProblemWithSetup(exception, log);
-		} catch (InstantiationException exception) {
-            logProblemWithSetup(exception, log);
-		} catch (IllegalAccessException exception) {
+		} catch (IllegalArgumentException | SecurityException | InstantiationException
+        | IllegalAccessException | NoSuchMethodException exception) {
             logProblemWithSetup(exception, log);
 		} catch (InvocationTargetException exception) {
             logProblemWithSetup(exception.getTargetException(), log);
-		} catch (NoSuchMethodException exception) {
-            logProblemWithSetup(exception, log);
-        } catch (ClassNotFoundException exception) {
+		} catch (ClassNotFoundException exception) {
             log.tag(_TAG).e(exception, "Generated _SegueController cannot be found. Was Prestige annotation processor "
                                      + "executed? Was it removed by ProGuard?");
 		}
@@ -119,22 +114,19 @@ public final class Prestige {
 	 */
 	public static void vanishController(Activity activity) {
         if (_segue_controller == null)
-            throw new IllegalStateException("Attempting to destroy controller before Segue Controller was created " +
-                    "(Prestige.conjureSegueController(String)).");
+            throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "destroy controller"));
 		_segue_controller.didDestroyActivity(activity);
 	}
 	
 	public static void registerForControllerBus(Activity activity) {
         if (_segue_controller == null)
-            throw new IllegalStateException("Attempting to register controller before Segue Controller was created " +
-                    "(Prestige.conjureSegueController(String)).");
+            throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "register controller"));
 		_segue_controller.registerForControllerBus(activity);
 	}
 	
 	public static void unregisterForControllerBus(Activity activity) {
         if (_segue_controller == null)
-            throw new IllegalStateException("Attempting to unregister controller before Segue Controller was created " +
-                    "(Prestige.conjureSegueController(String)).");
+            throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "unregister controller"));
 		_segue_controller.unregisterForControllerBus(activity);
 	}
 	
@@ -216,8 +208,7 @@ public final class Prestige {
 	@TargetApi(HONEYCOMB)
     public static void attachPresentationFragment(Activity activity, Fragment fragment) {
 		if (_segue_controller == null)
-			throw new IllegalStateException("Attempting to attach Presentation Fragment before Segue Controller was created " +
-					"(Prestige.conjureSegueController(String)).");
+			throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "attach Presentation Fragment"));
 		if (fragment.getTag() == null)
 			throw new IllegalArgumentException("Unable to inject Presentation Fragments without a tag: " + 
 					fragment.getClass().getCanonicalName());
@@ -226,8 +217,7 @@ public final class Prestige {
 
     public static void storeController(Activity activity) {
         if (_segue_controller == null)
-            throw new IllegalStateException("Attempting to store controller before Segue Controller was created " +
-                    "(Prestige.conjureSegueController(String)).");
+            throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "store controller"));
         _segue_controller.storeController(activity);
     }
 
@@ -311,9 +301,9 @@ public final class Prestige {
 			// Allows injectDataSource to be called on targets without a data source
 			_DATA_SOURCE_INJECTORS.put(target_class, _NO_OP);
 		} catch (InvocationTargetException exception) {
-			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception.getTargetException());
+			throw new UnableToInjectException(_UNABLE_TO_INJECT_DATA_SOURCE_FOR + target, exception.getTargetException());
 		} catch (Exception exception) {
-			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception);
+			throw new UnableToInjectException(_UNABLE_TO_INJECT_DATA_SOURCE_FOR + target, exception);
 		}
 	}
 
@@ -337,8 +327,6 @@ public final class Prestige {
         } catch (ClassNotFoundException _) {
             // Allows attachPresentation to be called on targets without a presentation field
             _PRESENTATION_INJECTORS.put(target_class, _NO_OP);
-        } catch (RuntimeException exception) {
-            throw exception;
         } catch (InvocationTargetException exception) {
             throw new UnableToInjectException("Unable to inject Presentation for " + target, exception.getTargetException());
         } catch (Exception exception) {
@@ -394,9 +382,9 @@ public final class Prestige {
 			// Allows injectDataSource to be called on targets without a data source
 			_ATTACHERS.put(target_class, _NO_OP);
 		} catch (InvocationTargetException exception) {
-			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception.getTargetException());
+			throw new UnableToInjectException(_UNABLE_TO_INJECT_DATA_SOURCE_FOR + target, exception.getTargetException());
 		} catch (Exception exception) {
-			throw new UnableToInjectException("Unable to inject Data Source for " + target, exception);
+			throw new UnableToInjectException(_UNABLE_TO_INJECT_DATA_SOURCE_FOR + target, exception);
 		}
 	}
 
@@ -444,7 +432,10 @@ public final class Prestige {
     /** Caches the Presentation injects previously found to reduce reflection impact */
     private static final Map<Class<?>, Method> _PRESENTATION_INJECTORS = newHashMap();
 	/** Caches the Presentation Fragment attaches previously found to reduce reflection impact */
-	private static final Map<Class<?>, Method> _ATTACHERS = newHashMap(); 
+	private static final Map<Class<?>, Method> _ATTACHERS = newHashMap();
+  private static final String _MESSAGE_SEGUE_CONTROLLER_MISSING =
+      "Attempting to %s before Segue Controller was created " +
+          "(Prestige.conjureSegueController(String)).";
 	/** Empty method */
 	private static final Method _NO_OP = null;
     /* package */static final String _TAG = "Prestige";

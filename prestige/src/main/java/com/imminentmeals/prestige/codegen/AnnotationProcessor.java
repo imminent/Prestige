@@ -1,7 +1,5 @@
 package com.imminentmeals.prestige.codegen;
 
-import android.annotation.SuppressLint;
-
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
@@ -9,17 +7,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Maps.EntryTransformer;
-import com.google.common.collect.Sets;
-import com.google.common.io.Closeables;
-import com.google.gson.ExclusionStrategy;
-import com.google.gson.FieldAttributes;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.InstanceCreator;
-import com.imminentmeals.prestige.ControllerContract;
 import com.imminentmeals.prestige.GsonProvider;
-import com.imminentmeals.prestige.Prestige;
-import com.imminentmeals.prestige.SegueController;
 import com.imminentmeals.prestige.annotations.Controller;
 import com.imminentmeals.prestige.annotations.Controller.Default;
 import com.imminentmeals.prestige.annotations.ControllerImplementation;
@@ -34,34 +22,17 @@ import com.imminentmeals.prestige.annotations.Presentation.NoProtocol;
 import com.imminentmeals.prestige.annotations.PresentationFragment;
 import com.imminentmeals.prestige.annotations.PresentationFragmentImplementation;
 import com.imminentmeals.prestige.annotations.PresentationImplementation;
-import com.imminentmeals.prestige.annotations.meta.Implementations;
-import com.squareup.javawriter.JavaWriter;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Writer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.processing.AbstractProcessor;
-import javax.annotation.processing.Filer;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -72,31 +43,17 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.JavaFileObject;
-
-import dagger.Lazy;
-import dagger.Module;
-import dagger.ObjectGraph;
-import dagger.Provides;
-import timber.log.Timber;
 
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Maps.newHashMapWithExpectedSize;
 import static com.google.common.collect.Maps.transformEntries;
 import static com.google.common.collect.Sets.newHashSet;
-import static com.google.common.collect.Sets.newLinkedHashSet;
-import static com.imminentmeals.prestige.annotations.meta.Implementations.PRODUCTION;
 import static com.imminentmeals.prestige.codegen.Utilities.getAnnotation;
-import static com.squareup.javawriter.JavaWriter.stringLiteral;
-import static java.lang.Math.min;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.element.ElementKind.INTERFACE;
-import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PROTECTED;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.ERROR;
@@ -125,7 +82,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	public static final String PRESENTATION_FRAGMENT_INJECTOR_SUFFIX = "$$PresentationFragmentInjector";
     public static final String PRESENTATION_INJECTOR_SUFFIX = "$$PresentationInjector";
 
-    @Override
+  @Override
 	public SourceVersion getSupportedSourceVersion() {
 		return SourceVersion.latestSupported();
 	}
@@ -139,8 +96,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	@Override
 	public boolean process(Set<? extends TypeElement> _, RoundEnvironment environment) {
 		// Makes sure to only process once
-		if (_passes++ > 0)
-			return true;
+		if (_passes++ > 0) return true;
 		
 		// Grabs the annotation processing utilities
 		_element_utilities = processingEnv.getElementUtils();
@@ -170,8 +126,8 @@ public class AnnotationProcessor extends AbstractProcessor {
 		processPresentationFragmentInjections(environment, presentation_fragment_injections, 
 				                              controller_presentation_fragment_injections, presentation_fragments);
 
-        // Processes the @InjectPresentation annotations
-        processPresentationInjections(environment, controller_presentation_injections);
+    // Processes the @InjectPresentation annotations
+    processPresentationInjections(environment, controller_presentation_injections);
 		
 		// Processes the @Controller annotations and @ControllerImplementation annotations per @Controller annotation
 		processControllers(environment, presentation_controller_bindings, controllers, presentations);
@@ -185,7 +141,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		// Reformats the gathered information to be used in data models
 		final ImmutableList.Builder<ModuleData> controller_modules = ImmutableList.builder();
 		for (Map.Entry<String, List<ControllerData>> controller_implementations : controllers.entrySet()) {
-			final Element implementation = controller_implementations.getValue().get(0)._implementation;
+			final Element implementation = controller_implementations.getValue().get(0).implementation;
 			final String package_name = _element_utilities.getPackageOf(implementation).getQualifiedName() + "";
 			final String class_name = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, 
 					controller_implementations.getKey()) + CONTROLLER_MODULE_SUFFIX;
@@ -195,7 +151,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		}
 		final ImmutableList.Builder<ModuleData> model_modules = ImmutableList.builder();
 		for (Map.Entry<String, List<ModelData>> model_implementations : models.entrySet()) {
-			final Element implementation = model_implementations.getValue().get(0)._implementation;
+			final Element implementation = model_implementations.getValue().get(0).implementation;
 			final String package_name = _element_utilities.getPackageOf(implementation).getQualifiedName() + "";
 			final String class_name = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, 
 					model_implementations.getKey()) + MODEL_MODULE_SUFFIX;
@@ -212,10 +168,10 @@ public class AnnotationProcessor extends AbstractProcessor {
 						final Map<Integer, List<PresentationFragmentInjectionData>> injections = newHashMap();
                         if (presentation_fragments == null) return ImmutableMap.copyOf(injections);
 						for (PresentationFragmentInjectionData presentation_fragment : presentation_fragments) {
-							if (presentation_fragment._is_manually_created)
+							if (presentation_fragment.is_manually_created)
 								// Skips the current injection, since it will be handled manually
 								continue;
-							for (Entry<Integer, Integer> injection : presentation_fragment._displays.entrySet())
+							for (Entry<Integer, Integer> injection : presentation_fragment.displays.entrySet())
 								if (injections.containsKey(injection.getKey()))
 									injections.get(injection.getKey()).add(presentation_fragment);
 								else
@@ -225,7 +181,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 					}
 				});
         final ImmutableMap.Builder<Element, ModelData> element_to_model_map = ImmutableMap.builder();
-        for (ModelData model : model_interfaces) element_to_model_map.put(model._interface, model);
+        for (ModelData model : model_interfaces) element_to_model_map.put(model.contract, model);
         final Map<String, Map<Element, ModelData>> model_implementations = newHashMap();
         final int number_of_scopes = models.size();
         for (Entry<String, List<ModelData>> entry : models.entrySet()) {
@@ -235,15 +191,19 @@ public class AnnotationProcessor extends AbstractProcessor {
                 model_implementations.put(entry.getKey(), scoped_models);
             }
             for (ModelData implementation : entry.getValue())
-                scoped_models.put(implementation._interface, implementation);
+                scoped_models.put(implementation.contract, implementation);
         }
 		
 		// Generates the code
-		generateSourceCode(presentation_controller_bindings, controller_modules.build(), data_source_injections,
-				           model_modules.build(), model_interfaces, element_to_model_map.build(),
-                           ImmutableMap.copyOf(model_implementations), model_injections,
-				           ImmutableMap.copyOf(presentation_fragment_display_injections),
-				           ImmutableMap.copyOf(controller_presentation_fragment_injections), controller_presentation_injections);
+    final CodeGenerator generator = new CodeGenerator(processingEnv.getFiler()
+        , processingEnv.getMessager(), _element_utilities, _type_utilities);
+		generator.generateSourceCode(presentation_controller_bindings, controller_modules.build(),
+        data_source_injections,
+        model_modules.build(), model_interfaces, element_to_model_map.build(),
+        ImmutableMap.copyOf(model_implementations), model_injections,
+        ImmutableMap.copyOf(presentation_fragment_display_injections),
+        ImmutableMap.copyOf(controller_presentation_fragment_injections),
+        controller_presentation_injections);
 	     
 		// Releases the annotation processing utilities
 		_element_utilities = null;
@@ -382,7 +342,7 @@ public class AnnotationProcessor extends AbstractProcessor {
             // Skips the current element
             if (presentation_fragment == null) continue;
 
-            note("\twith an implementation of " + implementation_element);
+            note(_WITH_AN_IMPLEMENTATION_OF + implementation_element);
 
             // Finds Presentation Fragment injections and verifies that their Protocols are met
             verifyPresentationFragmentSubProtocols(presentation_fragment_protocols
@@ -496,7 +456,7 @@ public class AnnotationProcessor extends AbstractProcessor {
             // Skips the current element
             if (presentation == null) continue;
 
-            note("\twith an implementation of " + implementation_element);
+            note(_WITH_AN_IMPLEMENTATION_OF + implementation_element);
 
             // Finds Presentation Fragment injections and verifies that their Protocols are met
             verifyPresentationSubProtocols(presentation_fragments, presentation_protocols.get(presentation).asType()
@@ -551,7 +511,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 		for (Element element : environment.getElementsAnnotatedWith(InjectDataSource.class)) {
 			final TypeElement enclosing_element = (TypeElement) element.getEnclosingElement();
 			note("@InjectDataSource is " + element);
-			note("\tin " + enclosing_element);
+			note(_IN + enclosing_element);
 			
 			// Verifies containing type is a Presentation or Presentation Fragment Implementation
 	        if (enclosing_element.getAnnotation(PresentationImplementation.class) == null &&
@@ -716,7 +676,7 @@ public class AnnotationProcessor extends AbstractProcessor {
             // Skips the current element
             if (controller == null) continue;
 
-            note("\twith an implementation of " + implementation_element);
+            note(_WITH_AN_IMPLEMENTATION_OF + implementation_element);
 
             // Gathers @ControllerImplementation information
             final String scope = implementation_element.getAnnotation(ControllerImplementation.class).value();
@@ -725,7 +685,7 @@ public class AnnotationProcessor extends AbstractProcessor {
             if (implementations == null)
                 controllers.put(scope, newArrayList(new ControllerData(controller, implementation_element)));
                 // Verifies that the scope-grouped @ControllerImplementations are in the same package
-            else if (!_element_utilities.getPackageOf(implementations.get(0)._implementation).equals(package_name)) {
+            else if (!_element_utilities.getPackageOf(implementations.get(0).implementation).equals(package_name)) {
                 error(controller, "All @ControllerImplementation(\"%s\") must be defined in the same package (%s).",
                         scope, implementation_element);
                 // Skips the current element
@@ -798,7 +758,7 @@ public class AnnotationProcessor extends AbstractProcessor {
             // Skips the current element
             if (model == null) continue;
 
-            note("\twith an implementation of " + implementation_element);
+            note(_WITH_AN_IMPLEMENTATION_OF + implementation_element);
 
             // Gathers @ModelImplementation information
             final ModelImplementation model_implementation = implementation_element.getAnnotation(ModelImplementation.class);
@@ -810,7 +770,7 @@ public class AnnotationProcessor extends AbstractProcessor {
             if (implementations == null)
                 models.put(scope, newArrayList(new ModelData(model, implementation_element, parameters, should_serialize)));
                 // Verifies that the scope-grouped @ControllerImplementations are in the same package
-            else if (!_element_utilities.getPackageOf(implementations.get(0)._implementation).equals(package_name)) {
+            else if (!_element_utilities.getPackageOf(implementations.get(0).implementation).equals(package_name)) {
                 error(model, "All @ModelImplementation(\"%s\") must be defined in the same package (%s).",
                         scope, implementation_element);
                 // Skips the current element
@@ -830,7 +790,7 @@ public class AnnotationProcessor extends AbstractProcessor {
     private void processModelInjections(RoundEnvironment environment, Map<Element, List<ModelInjectionData>> model_injections,
 			                            List<ModelData> models) {
         final Map<Element, Boolean> model_interfaces = newHashMapWithExpectedSize(models.size());
-        for (ModelData model : models) model_interfaces.put(model._interface, model._should_serialize);
+        for (ModelData model : models) model_interfaces.put(model.contract, model.should_serialize);
 
 		for (Element element : environment.getElementsAnnotatedWith(InjectModel.class)) {
 			// @InjectModel constructors are processed during @Model processing
@@ -839,7 +799,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			final TypeElement enclosing_element = (TypeElement) element
 					.getEnclosingElement();
 			note("@InjectModel is " + element);
-			note("\tin " + enclosing_element);
+			note(_IN + enclosing_element);
 
             // Verifies containing type is not a Presentation Implementation
             if (enclosing_element.getAnnotation(PresentationImplementation.class) != null) {
@@ -900,7 +860,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 			final TypeElement enclosing_element = (TypeElement) element
 					.getEnclosingElement();
 			note("@InjectPresentationFragment is " + element);
-			note("\tin " + enclosing_element);
+			note(_IN + enclosing_element);
 
 			// Verifies containing type is a Presentation, Presentation Fragment, or Controller implementation
 			if (enclosing_element.getAnnotation(PresentationImplementation.class) == null && 
@@ -973,7 +933,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 
             final TypeElement enclosing_element = (TypeElement) element.getEnclosingElement();
             note("@InjectPresentation is " + element);
-            note("\tin " + enclosing_element);
+            note(_IN + enclosing_element);
 
             // Verifies containing type is a Controller implementation
             if (enclosing_element.getAnnotation(ControllerImplementation.class) == null) {
@@ -1011,767 +971,6 @@ public class AnnotationProcessor extends AbstractProcessor {
             } else
                 controller_presentation_injections.put(enclosing_element, injection);
         }
-    }
-
-	@SuppressWarnings("unchecked")
-	private void generateSourceCode(List<PresentationControllerBinding> controllers, List<ModuleData> controller_modules,
-			                        List<DataSourceInjectionData> data_source_injections,
-			                        List<ModuleData> model_modules, List<ModelData> model_interfaces,
-                                    Map<Element, ModelData> element_to_model_interface,
-                                    Map<String, Map<Element, ModelData>> model_implementations,
-			                        Map<Element, List<ModelInjectionData>> model_injections,
-			                        Map<Element, Map<Integer, List<PresentationFragmentInjectionData>>> presentation_fragment_injections,
-			                        Map<Element, List<PresentationFragmentInjectionData>> controller_presentation_fragment_injections,
-                                    Map<Element, PresentationInjectionData> controller_presentation_injections) {
-		final Filer filer = processingEnv.getFiler();
-		Writer writer = null;
-		try {				
-			// Generates the _SegueController
-			JavaFileObject source_code = filer.createSourceFile(_SEGUE_CONTROLLER_SOURCE, (Element) null);
-	        writer = source_code.openWriter();
-	        writer.flush();
-	        generateSegueControllerSourceCode(writer, controllers, controller_modules, model_modules, model_interfaces
-                                            , element_to_model_interface, model_implementations);
-	        
-	        // Generates the *ControllerModules
-	        for (ModuleData controller_module : controller_modules) {
-	        	source_code = filer.createSourceFile(controller_module._qualified_name, (Element) null);
-	        	writer = source_code.openWriter();
-	        	writer.flush();
-	        	generateControllerModule(writer, controller_module._package_name, 
-	        			                 (List<ControllerData>) controller_module._components, controller_module._class_name);
-	        }
-	        
-	        // Generates the $$DataSourceInjectors
-	        final Elements element_utilities = processingEnv.getElementUtils();
-	        for (DataSourceInjectionData data_source_injection : data_source_injections) {
-	        	final TypeElement element = (TypeElement) data_source_injection._target;
-	        	source_code = filer.createSourceFile(element_utilities.getBinaryName(element) + DATA_SOURCE_INJECTOR_SUFFIX, 
-	        			                             element);
-	        	writer = source_code.openWriter();
-	        	writer.flush();
-	        	generateDataSourceInjector(writer, data_source_injection._package_name, data_source_injection._target,
-	        			                   data_source_injection._variable_name, data_source_injection._class_name);
-	        }
-	        
-	        // Generates the *ModelModules
-	        for (ModuleData model_module : model_modules) {
-	        	source_code = filer.createSourceFile(model_module._qualified_name, (Element) null);
-	        	writer = source_code.openWriter();
-	        	writer.flush();
-	        	generateModelModule(writer, model_module._package_name, (List<ModelData>) model_module._components,
-	        			            model_module._class_name);
-	        }
-	        
-	        // Generates the $$ModelInjectors
-	        for (Entry<Element, List<ModelInjectionData>> injection : model_injections.entrySet()) {
-	        	final TypeElement element = (TypeElement) injection.getKey();
-	        	final String full_name = element_utilities.getBinaryName(element) + MODEL_INJECTOR_SUFFIX;
-	        	source_code = filer.createSourceFile(full_name, element);
-	        	writer = source_code.openWriter();
-	        	writer.flush();
-	        	final String package_name = _element_utilities.getPackageOf(element) + "";
-	        	final String class_name = full_name.substring(package_name.length() + 1);
-	        	generateModelInjector(writer, package_name, injection.getValue(), class_name, element);
-	        }
-	        
-	        // Generates the $$PresentationFragmentInjectors
-	        for (Entry<Element, Map<Integer, List<PresentationFragmentInjectionData>>> injection : presentation_fragment_injections.entrySet()) {
-	        	final TypeElement element = (TypeElement) injection.getKey();
-	        	final String full_name = _element_utilities.getBinaryName(element) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
-	        	source_code = filer.createSourceFile(full_name, element);
-	        	writer = source_code.openWriter();
-	        	writer.flush();
-	        	final String package_name = _element_utilities.getPackageOf(element) + "";
-	        	final String class_name = full_name.substring(package_name.length() + 1);
-	        	generatePresentationFragmentInjector(writer, package_name, injection.getValue(), class_name, element);
-	        }
-	        for (Entry<Element, List<PresentationFragmentInjectionData>> injection : controller_presentation_fragment_injections.entrySet()) {
-	        	final TypeElement element = (TypeElement) injection.getKey();
-	        	final String full_name = _element_utilities.getBinaryName(element) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
-	        	source_code = filer.createSourceFile(full_name, element);
-	        	writer = source_code.openWriter();
-	        	writer.flush();
-	        	final String package_name = _element_utilities.getPackageOf(element) + "";
-	        	final String class_name = full_name.substring(package_name.length() + 1);
-	        	generateControllerPresentationFragmentInjector(writer, package_name, injection.getValue(), class_name, element);
-	        }
-
-            // Generates the $$PresentationInjectors
-            for (Entry<Element, PresentationInjectionData> injection : controller_presentation_injections.entrySet()) {
-                final TypeElement element = (TypeElement) injection.getKey();
-                final String full_name = _element_utilities.getBinaryName(element) + PRESENTATION_INJECTOR_SUFFIX;
-                source_code = filer.createSourceFile(full_name, element);
-                writer = source_code.openWriter();
-                writer.flush();
-                final String package_name = _element_utilities.getPackageOf(element) + "";
-                final String class_name = full_name.substring(package_name.length() + 1);
-                generateControllerPresentationInjector(writer, package_name, injection.getValue(), class_name, element);
-            }
-		} catch (IOException exception) {
-			processingEnv.getMessager().printMessage(ERROR, exception.getMessage());
-		} finally {
-			try {
-				Closeables.close(writer, writer != null);
-			} catch (IOException exception) {
-                processingEnv.getMessager().printMessage(ERROR, exception.getMessage());
-            }
-		}
-	}
-
-	/**
-	 *
-     * @param writer
-     * @param models
-     * @throws IOException
-	 */
-	private void generateSegueControllerSourceCode(Writer writer, List<PresentationControllerBinding> controllers,
-                                                   List<ModuleData> controller_modules, List<ModuleData> model_modules,
-                                                   List<ModelData> models, Map<Element, ModelData> element_to_model_interfaces,
-                                                   Map<String, Map<Element, ModelData>> model_implementations)
-			                                        		throws IOException {
-		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
-		final EnumSet<Modifier> protected_modifier = EnumSet.of(PROTECTED);
-        final String else_if = "else if";
-        String if_else_if_control;
-		JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-				   .emitPackage("com.imminentmeals.prestige")
-		           .emitImports(JavaWriter.type(ImmutableMap.class)
-                           , JavaWriter.type(GsonConverter.class)
-                           , JavaWriter.type(IOException.class)
-                           , JavaWriter.type(ArrayList.class)
-                           , JavaWriter.type(List.class)
-                           , JavaWriter.type(Nonnull.class)
-                           , JavaWriter.type(Inject.class)
-                           , JavaWriter.type(Named.class)
-                           , JavaWriter.type(Provider.class)
-                           , JavaWriter.type(Lazy.class)
-                           , JavaWriter.type(ObjectGraph.class)
-                           , JavaWriter.type(Timber.class))
-                   .emitEmptyLine()
-                   .emitStaticImports(JavaWriter.type(Prestige.class) + "._TAG")
-				   .emitEmptyLine()
-				   .emitJavadoc("<p>A Segue Controller that handles getting the appropriate Controller\n" +
-                           "for the current Presentation, and communicating with the Controller Bus.</p>")
-				   .beginType("com.imminentmeals.prestige._SegueController", "class", public_modifier
-                           // extends
-                           , JavaWriter.type(SegueController.class));
-		final StringBuilder controller_puts = new StringBuilder();
-		for (PresentationControllerBinding binding : controllers) {
-			java_writer.emitJavadoc("Provider for instances of the {@link %s} Controller", binding._controller)
-			           .emitAnnotation(Inject.class)
-			           .emitField("javax.inject.Provider<" + binding._controller + ">", binding._variable_name);
-			controller_puts.append(String.format(".put(%s.class, %s)%n",
-					    binding._presentation_implementation, binding._variable_name));
-		}
-
-        final StringBuilder model_puts = new StringBuilder();
-        emitModelFields(java_writer, models, model_puts);
-
-		// Constructor
-		java_writer.emitEmptyLine()
-		           .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
-		           .beginMethod(null, "com.imminentmeals.prestige._SegueController", public_modifier,
-                           JavaWriter.type(String.class), "scope",
-                           JavaWriter.type(Timber.class), "log")
-                   .emitStatement("super(scope, log)")
-				   .endMethod();
-
-		// SegueController Contract
-        emitStoreMethod(java_writer, models, element_to_model_interfaces, model_implementations, public_modifier, else_if);
-        // createObjectGraph
-        if_else_if_control = "if";
-        java_writer.emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .emitAnnotation(Nonnull.class)
-                   .beginMethod(JavaWriter.type(ObjectGraph.class), "createObjectGraph", protected_modifier)
-                   .emitStatement("final List<Object> modules = new ArrayList<Object>()")
-                   .emitSingleLineComment("Controller modules");
-        if (!controller_modules.isEmpty()) {
-            String production_module = null;
-            for (ModuleData controller_module : controller_modules)
-                if (controller_module._scope.equals(Implementations.PRODUCTION)) {
-                    production_module = String.format(Locale.US, "modules.add(new %s())", controller_module._qualified_name);
-                } else {
-                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
-                            , if_else_if_control, controller_module._scope))
-                            .emitStatement("modules.add(new %s())", controller_module._qualified_name)
-                            .endControlFlow();
-                    if_else_if_control = else_if;
-                }
-            if (production_module != null) java_writer.emitStatement(production_module);
-        }
-        java_writer.emitSingleLineComment("Model modules");
-        if (!model_modules.isEmpty()) {
-            if_else_if_control = "if";
-            String production_module = null;
-            for (ModuleData model_module : model_modules)
-                if (model_module._scope.equals(Implementations.PRODUCTION)) {
-                    production_module = String.format(Locale.US, "modules.add(new %s(log, this))", model_module._qualified_name);
-                } else {
-                    java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
-                            , if_else_if_control, model_module._scope))
-                            .emitStatement("modules.add(new %s(log, this))", model_module._qualified_name)
-                            .endControlFlow();
-                    if_else_if_control = else_if;
-                }
-            if (production_module != null) java_writer.emitStatement(production_module);
-        }
-        java_writer.emitStatement("return ObjectGraph.create(modules.toArray())")
-                   .endMethod();
-        // bindPresentationsToControllers
-        java_writer.emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .emitAnnotation(Nonnull.class)
-                   .beginMethod(JavaWriter.type(ImmutableMap.class, JavaWriter.type(Class.class, "?"), JavaWriter.type(Provider.class))
-                           , "bindPresentationsToControllers", protected_modifier)
-                   .emitStatement("return ImmutableMap.<Class<?>, Provider>builder()%n%s.build()", controller_puts)
-                   .endMethod();
-        // provideModelImplementations
-        java_writer.emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .emitAnnotation(Nonnull.class)
-                   .beginMethod(JavaWriter.type(ImmutableMap.class, JavaWriter.type(Class.class, "?"), JavaWriter.type(Lazy.class))
-                           , "provideModelImplementations", protected_modifier)
-                   .emitStatement("return ImmutableMap.<Class<?>, Lazy>builder()%n%s.build()", model_puts)
-                   .endMethod();
-	    java_writer.endType()
-				   .emitEmptyLine();
-		java_writer.close();
-	}
-
-    private static StringBuilder emitModelFields(JavaWriter java_writer, List<ModelData> models, StringBuilder model_puts)
-            throws IOException {
-        for (ModelData model : models) {
-            java_writer.emitJavadoc("Provider for instances of the {@link %s} Model", model._interface)
-                       .emitAnnotation(Inject.class)
-                       .emitField("dagger.Lazy<" + model._interface + ">", model._variable_name);
-            model_puts.append(String.format(".put(%s.class, %s)%n",
-            model._interface, model._variable_name));
-            if (model._should_serialize)
-                java_writer.emitJavadoc("Provider for {@link %s} for {@link %s}", JavaWriter.type(GsonConverter.class)
-                                      , model._interface)
-                           .emitAnnotation(Inject.class)
-                           .emitAnnotation(Named.class, stringLiteral(model._interface + ""))
-                           .emitField(JavaWriter.type(Lazy.class, JavaWriter.type(GsonConverter.class))
-                                   , model._variable_name + _CONVERTOR);
-        }
-        return model_puts;
-    }
-
-    // TODO: cyclomatic 11
-    private void emitStoreMethod(JavaWriter java_writer, List<ModelData> models, Map<Element, ModelData> element_to_model_interfaces
-                               , Map<String, Map<Element, ModelData>> model_implementations, EnumSet<Modifier> public_modifier
-                               , String else_if) throws IOException {
-        String if_else_if_control;
-        java_writer.emitEmptyLine()
-                   .emitAnnotation(Override.class)
-                   .beginMethod("<T> void", "store", public_modifier, newArrayList("T", "object")
-                           , newArrayList(JavaWriter.type(IOException.class)));
-        if_else_if_control = "if";
-        String nested_if_else_if;
-        for (ModelData model : models) {
-            if (!model._should_serialize) continue;
-
-            nested_if_else_if = "if";
-            java_writer.beginControlFlow(String.format("%s (object instanceof %s)", if_else_if_control, model._interface))
-                       .emitStatement("log.tag(_TAG).d(\"Storing \" + object)")
-                       .emitStatement("%s%s.get().toStream(object, gson_provider.get().outputStreamFor(%s.class))"
-                                    , model._variable_name, _CONVERTOR, model._interface);
-
-            // TODO: avoid storing the same model multiple times in one pass
-            for (Entry<String, Map<Element, ModelData>> entry : model_implementations.entrySet()) {
-                final ModelData model_implementation = modelImplementation(model, model_implementations, entry.getValue());
-                if (shouldSkipModelImplementation(model_implementation)) continue;
-
-                java_writer.beginControlFlow(String.format("%s (scope.equals(\"%s\"))", nested_if_else_if, entry.getKey()));
-                emitRecursiveStoreCalls(java_writer, element_to_model_interfaces, model_implementation);
-                java_writer.endControlFlow();
-                nested_if_else_if = else_if;
-            }
-            if (nested_if_else_if.equals(else_if)) {
-                ModelData model_implementation = model_implementations.get(PRODUCTION).get(model._interface);
-                if (shouldSkipModelImplementation(model_implementation)) continue;
-                java_writer.beginControlFlow("else");
-                emitRecursiveStoreCalls(java_writer, element_to_model_interfaces, model_implementation);
-                java_writer.endControlFlow();
-            }
-            java_writer.endControlFlow();
-            if_else_if_control = else_if;
-        }
-        java_writer.endMethod();
-    }
-
-    private static boolean shouldSkipModelImplementation(ModelData model_implementation) {
-        return model_implementation == null
-            || !model_implementation._should_serialize
-            || model_implementation._parameters == null;
-    }
-
-    private void emitRecursiveStoreCalls(JavaWriter java_writer, Map<Element, ModelData> element_to_model_interfaces, ModelData model_implementation) throws IOException {
-        for (Element parameter : model_implementation._parameters) {
-            final ModelData sub_model = element_to_model_interfaces.get(_type_utilities.asElement(parameter.asType()));
-            if (!sub_model._should_serialize) continue;
-            java_writer.emitStatement("store(createModel(%s.class))", sub_model._interface);
-        }
-    }
-
-    private static ModelData modelImplementation(ModelData model, Map<String, Map<Element, ModelData>> model_implementations,
-                                                 Map<Element, ModelData> models) {
-        ModelData model_implementation = models.get(model._interface);
-        if (model_implementation == null)
-            model_implementation = model_implementations.containsKey(PRODUCTION)
-                    ? model_implementations.get(PRODUCTION).get(model._interface)
-                    : null;
-        return model_implementation;
-    }
-
-    /**
-     * TODO: move Controller Bus provider to a Segue Controller module?
-	 * @param writer
-	 * @param package_name
-	 * @param controllers
-	 * @param class_name
-	 */
-	private void generateControllerModule(Writer writer, String package_name, List<ControllerData> controllers, 
-			                             String class_name) throws IOException {
-		final EnumSet<Modifier> public_modifier = EnumSet.of(PUBLIC);
-		JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-				   .emitPackage(package_name)
-				   .emitImports("javax.inject.Named",
-						        "com.imminentmeals.prestige._SegueController",
-						        "com.squareup.otto.Bus",
-						        "dagger.Module",
-						        "dagger.Provides",
-						        "javax.inject.Singleton")
-					.emitEmptyLine();
-		final StringBuilder controller_list = new StringBuilder();
-		for (ControllerData controller : controllers) {
-			controller_list.append("<li>{@link ").append(controller._interface).append("}</li>\n");
-		}
-		java_writer.emitJavadoc("<p>Module for injecting:\n" +
-				                "<ul>\n" +
-				                "%s" +
-				                "</ul></p>", controller_list)
-				   .emitAnnotation(Module.class, ImmutableMap.of(
-						   "injects",
-						   "{\n" +
-								   "_SegueController.class" +
-						   "\n}",
-						   "overrides", !class_name.equals(_DEFAULT_CONTROLLER_MODULE),
-						   "library", true,
-						   "complete", false))
-					.beginType(class_name, "class", public_modifier)
-					.emitEmptyLine()
-					.emitAnnotation(Provides.class)
-					.emitAnnotation(Singleton.class)
-					.emitAnnotation(Named.class, ControllerContract.BUS)
-					.beginMethod("com.squareup.otto.Bus", "providesControllerBus", EnumSet.noneOf(Modifier.class))
-					.emitStatement("return new Bus(\"Controller Bus\")")
-					.endMethod();
-		// Controller providers
-		for (ControllerData controller : controllers)
-			java_writer.emitEmptyLine()
-			           .emitAnnotation(Provides.class)
-			           .beginMethod(controller._interface + "", "provides" + controller._interface.getSimpleName(),
-			        		        EnumSet.noneOf(Modifier.class))
-			           .emitStatement("return new %s()", controller._implementation)
-			           .endMethod();
-		java_writer.endType();
-		java_writer.close();
-	}
-	
-	/**
-	 * @param writer
-	 * @param package_name
-	 * @param variable_name
-	 * @param class_name
-	 */
-	private void generateDataSourceInjector(Writer writer, String package_name, Element target, String variable_name,
-			                                String class_name) throws IOException {
-		final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-		           .emitPackage(package_name)
-		           .emitImports(JavaWriter.type(Finder.class))
-			       .emitEmptyLine()
-			       .emitJavadoc("<p>Injects the Data Source into {@link %s}'s %s.</p>", target, variable_name)
-			       .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
-			       .emitEmptyLine()
-			       .emitJavadoc("<p>Injects the Data Source into {@link %s}'s %s.</p>\n" +
-                                "@param segue_controller The Segue Controller\n" +
-			       		        "@param finder The finder that specifies how to retrieve the context from the target\n" +
-			       		        "@param target The target of the injection", target, variable_name)
-			       .beginMethod("void", "injectDataSource", EnumSet.of(PUBLIC, STATIC),
-                                JavaWriter.type(SegueController.class), "segue_controller",
-			    		        JavaWriter.type(Finder.class), "finder", 
-			    		        target + "", "target")
-			       .emitStatement("target.%s = " +
-			       		"segue_controller.dataSource(" +
-			       		"finder.findContext(target).getClass())", 
-			       		variable_name)
-			       .endMethod()
-			       .endType()
-			       .emitEmptyLine();
-		java_writer.close();
-	}
-	
-	/**
-     * TODO: should there be a no-op GsonConverter for when model is serialized only under certain scopes? Or move that declaration to @Model
-	 * @param writer
-	 * @param package_name
-	 * @param models
-	 * @param class_name
-	 */
-	private void generateModelModule(Writer writer, String package_name, List<ModelData> models, String class_name)
-			throws IOException {
-        final String file_tested = "_file_tested";
-        final EnumSet<Modifier> private_final = EnumSet.of(PRIVATE, FINAL);
-        final EnumSet<Modifier> private_modifier = EnumSet.of(PRIVATE);
-		final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-				   .emitPackage(package_name)
-				   .emitImports("com.imminentmeals.prestige._SegueController",
-						        "dagger.Module",
-						        "dagger.Provides",
-						        "javax.inject.Singleton",
-                                JavaWriter.type(Gson.class),
-                                JavaWriter.type(GsonProvider.class),
-                                JavaWriter.type(GsonConverter.class),
-                                JavaWriter.type(InputStream.class),
-                                JavaWriter.type(IOException.class),
-                                JavaWriter.type(Named.class),
-                                JavaWriter.type(ExclusionStrategy.class),
-                                JavaWriter.type(FieldAttributes.class),
-                                JavaWriter.type(InstanceCreator.class),
-                                JavaWriter.type(Set.class),
-                                JavaWriter.type(SegueController.class))
-                   .emitStaticImports(JavaWriter.type(Sets.class) + ".newHashSet")
-				   .emitEmptyLine();
-		java_writer.emitJavadoc("<p>Module for injecting:\n" +
-                                "<ul>\n" +
-                                "%s" +
-                                "</ul></p>", modelList(models))
-				   .emitAnnotation(Module.class, ImmutableMap.of(
-                           "injects",
-                           "{\n" +
-                                   "_SegueController.class" +
-                                   "\n}",
-                           "overrides", !class_name.equals(_DEFAULT_MODEL_MODULE),
-                           "library", true,
-                           "complete", false))
-				   .beginType(class_name, "class", EnumSet.of(PUBLIC))
-				   .emitEmptyLine()
-                   .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log"
-                              , JavaWriter.type(SegueController.class), "segue_controller")
-                   .emitStatement("this.log = log")
-                   .emitStatement("_segue_controller = segue_controller")
-                   .endMethod()
-                   .emitEmptyLine()
-                   .emitAnnotation(Provides.class)
-                   .emitAnnotation(Singleton.class)
-                   .beginMethod(JavaWriter.type(Gson.class), "providesGson", EnumSet.noneOf(Modifier.class)
-                              , JavaWriter.type(GsonProvider.class), "gson_provider")
-                   .emitStatement("return buildGson(gson_provider.gsonBuilder())")
-                   .endMethod();
-		// Model providers
-		for (ModelData model : models) {
-            java_writer.emitEmptyLine()
-                       .emitAnnotation(Provides.class)
-                       .emitAnnotation(Singleton.class);
-            String[] provider_parameters = model._should_serialize
-                    ? new String[] {
-                        JavaWriter.type(GsonProvider.class)
-                      , "gson_provider"
-                      , "@Named(" + stringLiteral(model._interface + "")+ ") " + JavaWriter.type(GsonConverter.class)
-                      , "converter" }
-                    : new String[0];
-            final String[] new_instance_format_parameters;
-			if (model._parameters == null || model._parameters.isEmpty()) {
-                new_instance_format_parameters = new String[] { java_writer.compressType(model._implementation + ""), "" };
-            } else {
-				final Set<String> provider_method_parameters = newLinkedHashSet(Arrays.asList(provider_parameters));
-                final List<String> constructor_parameters = constructorParameters(model, provider_method_parameters);
-                provider_parameters = provider_method_parameters.toArray(provider_parameters);
-                new_instance_format_parameters = new String[] {
-                        java_writer.compressType(model._implementation + "")
-                      , Joiner.on(", ").join(constructor_parameters) };
-			}
-            java_writer.beginMethod(model._interface + "", "provides" + model._interface.getSimpleName(),
-                    EnumSet.noneOf(Modifier.class), provider_parameters);
-            if (model._should_serialize) {
-                java_writer.emitStatement("InputStream input_stream = null")
-                           .beginControlFlow("try")
-                           .beginControlFlow(String.format("if (!_%s%s)", model._variable_name, file_tested))
-                           .emitStatement("_%s%s = true", model._variable_name, file_tested)
-                           .emitStatement("input_stream = gson_provider.inputStreamFor(%s.class)", model._interface)
-                           .emitStatement("log.tag(_TAG).d(\"Restoring %s from input stream\")", java_writer.compressType(model._implementation + ""))
-                           .emitStatement("return (%s) converter.from(input_stream)", java_writer.compressType(model._implementation + ""))
-                           .nextControlFlow("else")
-                           .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
-                           .endControlFlow()
-                           .nextControlFlow("catch (Exception _)")
-                           .emitStatement("log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model._interface)
-                           .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
-                           .nextControlFlow("finally")
-                           .beginControlFlow("if (input_stream != null)")
-                           .beginControlFlow("try")
-                           .emitStatement("input_stream.close()")
-                           .nextControlFlow("catch (IOException _)")
-                           .endControlFlow()
-                           .endControlFlow()
-                           .endControlFlow()
-                           .endMethod();
-
-                // Creates the GsonConverter
-                java_writer.emitEmptyLine()
-                        .emitAnnotation(Provides.class)
-                        .emitAnnotation(Singleton.class)
-                        .emitAnnotation(Named.class, stringLiteral(model._interface + ""))
-                        .beginMethod(JavaWriter.type(GsonConverter.class),
-                                "provides" + model._implementation.getSimpleName() + "Converter",
-                                EnumSet.noneOf(Modifier.class), JavaWriter.type(Gson.class), "gson")
-                        .emitStatement("return new %s(gson, %s.class)"
-                                , JavaWriter.type(GsonConverter.class, model._implementation + ""), model._implementation)
-                        .endMethod();
-            } else {
-                java_writer.emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
-                           .endMethod();
-            }
-        }
-		java_writer.emitEmptyLine()
-                   .beginMethod(JavaWriter.type(Gson.class), "buildGson", EnumSet.of(PRIVATE)
-                              , JavaWriter.type(GsonBuilder.class), "gson_builder");
-        final Joiner new_line_joiner = Joiner.on("%n");
-        final List<String> model_exclusions = newArrayListWithCapacity(models.size());
-        final String model_exclusion = "(Class) %s.class";
-        for (ModelData model : models) {
-            model_exclusions.add(String.format(model_exclusion, model._interface));
-            if (model._should_serialize) {
-                java_writer.emitStatement("final InstanceCreator<%1$s> %1$s_creator = _segue_controller.instanceCreator(%2$s.class)"
-                                        , java_writer.compressType(model._implementation + ""), model._interface)
-                           .emitStatement("gson_builder.registerTypeAdapter(%1$s.class, %1$s_creator)"
-                                   , java_writer.compressType(model._implementation + ""));
-            }
-        }
-        java_writer.emitStatement(new_line_joiner.join(
-                "gson_builder.addSerializationExclusionStrategy(new ExclusionStrategy() {"
-              , "    public boolean shouldSkipField(FieldAttributes field) {"
-              , "      return _models.contains(field.getDeclaredClass());"
-              , "    }"
-              , "    public boolean shouldSkipClass(Class<?> _) {"
-              , "      return false;"
-              , "    }"
-              , "    private final Set<Class> _models = newHashSet(%s);"
-              , "})"), Joiner.on(",\n\t\t").join(model_exclusions))
-                   .emitStatement("return gson_builder.create()")
-                   .endMethod()
-                   .emitEmptyLine()
-                   .emitJavadoc("Log where messages are written")
-                   .emitField(JavaWriter.type(Timber.class), "log", private_final)
-                   .emitField(JavaWriter.type(String.class), "_TAG", EnumSet.of(PRIVATE, STATIC, FINAL), stringLiteral("Prestige"))
-                   .emitJavadoc("Segue Controller")
-                   .emitField(JavaWriter.type(SegueController.class), "_segue_controller", private_final);
-        for (ModelData model : models)
-            if (model._should_serialize)
-                java_writer.emitField(JavaWriter.type(boolean.class), '_' + model._variable_name + file_tested, private_modifier, "false");
-        java_writer.endType();
-		java_writer.close();
-	}
-
-    private List<String> constructorParameters(ModelData model, Set<String> provider_method_parameters) {
-        final List<String> constructor_parameters = newArrayList();
-        for (VariableElement parameter : model._parameters) {
-            final String type = _type_utilities.asElement(parameter.asType()) + "";
-            final String parameter_string = parameter + "";
-            if (!provider_method_parameters.contains(type)) {
-                provider_method_parameters.add(type);
-                provider_method_parameters.add(parameter_string);
-            }
-            constructor_parameters.add(parameter_string);
-        }
-        return constructor_parameters;
-    }
-
-    private static StringBuilder modelList(List<ModelData> models) {
-        final String list_opener = "<li>{@link ";
-        final String list_closer = "}</li>\n";
-        final StringBuilder model_list = new StringBuilder();
-        for (ModelData model : models)
-            model_list.append(list_opener).append(model._interface).append(list_closer);
-        return model_list;
-    }
-
-    /**
-	 * @param writer
-	 * @param package_name
-	 * @param class_name
-	 */
-	private void generateModelInjector(Writer writer, String package_name, List<ModelInjectionData> injections,
-			                           String class_name, Element target) throws IOException {
-		final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-		           .emitPackage(package_name)
-			       .emitEmptyLine()
-			       .emitJavadoc("<p>Injects the Models into {@link %s} and stores them for later use.</p>", class_name)
-			       .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
-			       .emitEmptyLine()
-			       .emitJavadoc("<p>Injects the Models into {@link %s}.</p>\n" +
-			       		        "@param segue_controller The Segue Controller from which to retrieve Models\n" +
-			       		        "@param target The target of the injection", target)
-			       .beginMethod("void", "injectModels", EnumSet.of(PUBLIC, STATIC),
-			    		        JavaWriter.type(SegueController.class), "segue_controller",
-                                ((TypeElement) target).getQualifiedName() + "", "target");
-		for (ModelInjectionData injection : injections)
-			java_writer.emitStatement("target.%s = segue_controller.createModel(%s.class)", injection._variable_name,
-					                  injection._variable.asType());
-		java_writer.endMethod()
-                   .emitEmptyLine()
-                   .emitJavadoc("<p>Stores the Models from {@link %s}.</p>\n" +
-                           "@param segue_controller The Segue Controller used to store Models\n" +
-                           "@param source The source of models to store", target)
-                   .beginMethod("void", "storeModels", EnumSet.of(PUBLIC, STATIC),
-                           newArrayList(JavaWriter.type(SegueController.class), "segue_controller",
-                           ((TypeElement) target).getQualifiedName() + "", "source"),
-                           newArrayList(JavaWriter.type(IOException.class)));
-        for (ModelInjectionData injection : injections)
-            java_writer.emitStatement("segue_controller.store(source.%s)", injection._variable_name);
-        java_writer.endMethod()
-			       .endType()
-			       .emitEmptyLine();
-		java_writer.close();
-	}
-
-	private void generateControllerPresentationFragmentInjector(Writer writer, String package_name, 
-			List<PresentationFragmentInjectionData> injections, String class_name, Element target) throws IOException {
-		final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-		           .emitPackage(package_name)
-		           .emitEmptyLine()
-		           .emitEmptyLine()
-		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", class_name)
-		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
-		           .emitEmptyLine()
-		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
-                           "@param target The target of the injection\n" +
-                           "@param presentation_fragment The presentation fragment to inject\n" +
-                           "@param tag The tag that labels the presentation fragment", target)
-		           .beginMethod("void", "attachPresentationFragment",
-                           EnumSet.of(PUBLIC, STATIC),
-                           processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
-                           JavaWriter.type(Object.class), "presentation_fragment",
-                           JavaWriter.type(String.class), "tag");
-		final String control_format = "%s (presentation_fragment instanceof %s &&%n" +
-		        		              "\ttag.equals(\"%s\"))";
-		if (!injections.isEmpty()) {
-			final PresentationFragmentInjectionData injection = injections.get(0);
-			java_writer.beginControlFlow(String.format(control_format, "if", injection._implementation, injection._tag))
-			           .emitStatement("target.%s = (%s) presentation_fragment", injection._variable_name, 
-			        		          injection._variable.asType())
-			           .endControlFlow();
-		}
-		for (PresentationFragmentInjectionData injection : injections.subList(min(1, injections.size()), injections.size()))
-			java_writer.beginControlFlow(String.format(control_format, "else if", injection._implementation, injection._tag))
-		               .emitStatement("target.%s = (%s) presentation_fragment", injection._variable_name,
-		            		          injection._variable.asType())
-		               .endControlFlow();
-		
-		java_writer.endMethod()
-		           .endType()
-		           .emitEmptyLine();
-		java_writer.close();
-	}
-	
-	@SuppressLint("NewApi")
-    private void generatePresentationFragmentInjector(Writer writer, String package_name,
-			Map<Integer, List<PresentationFragmentInjectionData>> injections, String class_name, Element target) throws IOException {
-		final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-		java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-		           .emitPackage(package_name)
-		           .emitEmptyLine()
-		           .emitImports("android.app.FragmentManager",
-		        		        "android.app.Fragment",
-		        		        JavaWriter.type(Finder.class),
-		        		        "android.content.Context")
-		           .emitEmptyLine()
-		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>", target)
-		           .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
-		           .emitEmptyLine()
-		           .emitJavadoc("<p>Injects the Presentation Fragments into {@link %s}.</p>\n" +
-                           "@param finder The finder that specifies how to retrieve the context\n" +
-                           "@param display The current display state\n" +
-                           "@param target The target of the injection", target)
-		           .beginMethod("void", "injectPresentationFragments",
-                           EnumSet.of(PUBLIC, STATIC),
-                           JavaWriter.type(Finder.class), "finder",
-                           JavaWriter.type(int.class), "display",
-                           processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target");
-		if (!injections.isEmpty()) {
-			java_writer.emitStatement("final Context context = finder.findContext(target)")
-			           .emitStatement("final FragmentManager fragment_manager = finder.findFragmentManager(target)")
-			           .beginControlFlow("switch (display)");
-			for (Entry<Integer, List<PresentationFragmentInjectionData>> entry : injections.entrySet()) {
-				java_writer.beginControlFlow("case " + entry.getKey() + ":");
-				final StringBuilder transactions = new StringBuilder();
-				for (PresentationFragmentInjectionData injection : entry.getValue()) {
-					java_writer.emitStatement("target.%s = (%s) Fragment.instantiate(context, \"%s\")", injection._variable_name,
-			                                  injection._variable.asType(), injection._implementation);
-	                transactions.append("\t.add(")
-                                .append(injection._displays.get(entry.getKey()))
-                                .append(",\n")
-                                .append("\t(Fragment) \ttarget.")
-                                .append(injection._variable_name);
-	                if (!injection._tag.isEmpty())
-	                	transactions.append(",\n\"").append(injection._tag).append("\"");
-	                transactions.append(")\n");
-				}
-				java_writer.emitStatement("fragment_manager.beginTransaction()\n" + transactions + "\t.commit()")
-						   .emitStatement("break")
-		                   .endControlFlow();
-			}
-			java_writer.endControlFlow();
-		}
-		java_writer.endMethod()
-                   .endType()
-                   .emitEmptyLine();
-		java_writer.close();
-	}
-
-    private void generateControllerPresentationInjector(Writer writer, String package_name, PresentationInjectionData injection,
-                                                        String class_name, Element target) throws IOException {
-        final JavaWriter java_writer = new JavaWriter(writer);
-        java_writer.setCompressingTypes(true);
-        java_writer.emitSingleLineComment("Generated code from Prestige. Do not modify!")
-                .emitPackage(package_name)
-                .emitEmptyLine()
-                .emitEmptyLine()
-                .emitJavadoc("<p>Injects the Presentation into {@link %s}.</p>", class_name)
-                .beginType(class_name, "class", EnumSet.of(PUBLIC, FINAL))
-                .emitEmptyLine()
-                .emitJavadoc("<p>Injects the Presentation into {@link %s}.</p>\n" +
-                        "@param target The target of the injection\n" +
-                        "@param presentation The presentation to inject", target)
-                .beginMethod("void", "attachPresentation",
-                        EnumSet.of(PUBLIC, STATIC),
-                        processingEnv.getElementUtils().getBinaryName((TypeElement) target) + "", "target",
-                        JavaWriter.type(Object.class), "presentation");
-        final String control_format = "if (presentation instanceof %s)";
-        java_writer.beginControlFlow(String.format(Locale.US, control_format, injection._variable.asType()))
-                .emitStatement("target.%s = (%s) presentation", injection._variable_name, injection._variable.asType())
-                .endControlFlow();
-
-        java_writer.endMethod()
-                .endType()
-                .emitEmptyLine();
-        java_writer.close();
     }
 	
 	@CheckForNull private List<? extends VariableElement> injectModelConstructor(TypeElement element) {
@@ -1813,8 +1012,7 @@ public class AnnotationProcessor extends AbstractProcessor {
 	 * @param arguments Arguments to format into the message
 	 */
 	private void error(Element element, String message, Object... arguments) {
-		processingEnv.getMessager().printMessage(ERROR,
-				String.format(message, arguments), element);
+		processingEnv.getMessager().printMessage(ERROR, String.format(message, arguments), element);
 	}
 
     /**
@@ -1823,285 +1021,13 @@ public class AnnotationProcessor extends AbstractProcessor {
      * @param arguments Arguments to format into the message
      */
     private void note(String message, Object... arguments) {
-        processingEnv.getMessager().printMessage(NOTE,
-                String.format(message, arguments));
+        processingEnv.getMessager().printMessage(NOTE, String.format(message, arguments));
     }
-	
-	/**
-	 * <p>Container for Presentation Controller binding data. Relates an @Controller to an @Presentation's 
-	 * implementation and provides a name to use to refer to an instance of the @Controller's implementation.</p>
-	 * @author Dandre Allison
-	 */
-	private static class PresentationControllerBinding {
-		
-		private final Element _controller;
-		private final String _variable_name;
-		private final Element _presentation_implementation;
-		
-		/**
-		 * <p>Constructs a {@link PresentationControllerBinding}.</p>
-		 * @param controller The @Controller
-		 * @param presentation_implementation The implementation of the @Controller's @Presentation 
-		 */
-		public PresentationControllerBinding(Element controller, Element presentation_implementation) {
-			final String class_name = controller.getSimpleName() + "";
-			_controller = controller;
-			_variable_name = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, class_name);
-			_presentation_implementation = presentation_implementation;
-		}
-	}
-	
-	/**
-	 * <p>Container for @Controller data, groups the Controller interface with its implementation</p>.
-	 * @author Dandre Allison
-	 */
-	private static class ControllerData {
-		/** The @ControllerImplementation stored for use in setting up code generation */
-		private final Element _implementation;
-		private final Element _interface;
-		
-		/**
-		 * <p>Constructs a {@link ControllerData}.<p>
-		 * @param controller The @Controller 
-		 * @param controller_implementation The implementation of the @Controller
-		 */
-		public ControllerData(Element controller, Element controller_implementation) {
-			_implementation = controller_implementation;
-			_interface = controller;
-		}
-	}
-	
-	/**
-	 * <p>Container for @Model data, groups the Model interface with its implementation</p>.
-	 * @author Dandre Allison
-	 */
-	private static class ModelData {
-		/** The @ModelImplementation stored for use in setting up code generation */
-		private final Element _implementation;
-		private final Element _interface;
-		private final List<? extends VariableElement> _parameters;
-		private final String _variable_name;
-        private final boolean _should_serialize;
 
-        /**
-         * <p>
-         * Constructs a {@link ModelData}.
-         * <p>
-         *
-         * @param model The @Model
-         * @param should_serialize Indicates if serialization logic should be implemented for the model
-         */
-        public ModelData(@Nonnull Element model, boolean should_serialize) {
-            this(model, null, null, should_serialize);
-        }
-
-		/**
-		 * <p>
-		 * Constructs a {@link ModelData}.
-		 * <p>
-		 * 
-		 * @param model The @Model
-		 * @param model_implementation The implementation of the @Model
-         * @param parameters Parameters of the model implementation's constructor (list of models on which it depends)
-         * @param should_serialize Indicates if serialization logic should be implemented for the model
-		 */
-		public ModelData(@Nonnull Element model, Element model_implementation, List<? extends VariableElement> parameters
-                       , boolean should_serialize) {
-			_implementation = model_implementation;
-			_interface = model;
-			_parameters = parameters;
-			_variable_name = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, model.getSimpleName() + "");
-            _should_serialize = should_serialize;
-		}
-
-        @Override
-        public int hashCode() {
-            return _interface.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object object) {
-            if (!(object instanceof ModelData)) return false;
-            final ModelData other = (ModelData) object;
-            return _interface.equals(other._interface)
-                && (_implementation == null || other._implementation == null
-                 || _implementation.equals(other._implementation));
-        }
-
-        @Override
-        public String toString() {
-            return _interface + "";
-        }
-    }
-	
-	/**
-	 * <p>Container for Presentation Fragment data.</p>
-	 * @author Dandre Allison
-	 */
-	private static class PresentationFragmentData extends PresentationData {
-		
-		/**
-		 * <p>Constructs a {@link PresentationData}.</p>
-		 * @param protocol The Protocol
-		 * @param implementation The presentation implementation
-		 */
-		public PresentationFragmentData(Element protocol, Element implementation) {
-			super(protocol, implementation);
-		}
-
-		@Override
-		public String toString() {
-			return String.format(format, protocol, implementation);
-		}
-		
-		private static final String format = "{protocol: %s, implementation: %s}";
-	}
-	
-	/**
-	 * <p>Container for Presentation data.</p>
-	 * @author Dandre Allison
-	 */
-	private static class PresentationData {
-		/** The Protocol */
-		protected final Element protocol;
-		/** The Presentation implementation */
-		protected final Element implementation;
-		
-		/**
-		 * <p>Constructs a {@link PresentationData}.</p>
-		 * @param protocol The Protocol
-		 * @param implementation The presentation implementation
-		 */
-		public PresentationData(Element protocol, Element implementation) {
-			this.protocol = protocol;
-			this.implementation = implementation;
-		}
-
-		@Override
-		public String toString() {
-			return String.format(format, protocol, implementation);
-		}
-		
-		private static final String format = "{protocol: %s, implementation: %s}";
-	}
-	
-	private static class ModuleData {
-		private final String _qualified_name;
-		private final String _scope;
-		private final String _class_name;
-		private final String _package_name;
-		private final List<?> _components;
-		
-		/**
-		 * <p>Constructs a {@link ModuleData}.</p>
-		 * @param scope The implementation scope the module provides
-		 */
-		public ModuleData(String name, String scope, String class_name, String package_name, List<?> components) {
-			_qualified_name = name;
-			_scope = scope;
-			_class_name = class_name;
-			_package_name = package_name;
-			_components = components;
-		}
-	}
-	
-	private static class DataSourceInjectionData {
-		private final String _package_name;
-		private final Element _target;
-		private final String _variable_name;
-		private final String _class_name;
-		
-		/**
-		 * <p>Constructs a {@link DataSourceInjectionData}.</p>
-		 * @param target The target of the injection
-		 * @param variable The variable from the target in which to inject the Data Source
-		 */
-		public DataSourceInjectionData(String package_name, Element target, Element variable, String element_class) {
-			_package_name = package_name;
-			_target = target;
-			_variable_name = variable.getSimpleName() + "";
-			_class_name = element_class.substring(package_name.length() + 1) + DATA_SOURCE_INJECTOR_SUFFIX;
-		}
-	}
-	
-	private static class ModelInjectionData {
-		private final String _package_name;
-		private final Element _variable;
-		private final String _variable_name;
-		private final String _class_name;
-        private final boolean _should_serialize;
-		
-		/**
-		 * <p>Constructs a {@link ModelInjectionData}.</p>
-		 * @param variable The variable in which to inject the Model
-		 */
-		public ModelInjectionData(String package_name, Element variable, String element_class, boolean should_serialize) {
-			_package_name = package_name;
-			_variable = variable;
-			_variable_name = variable.getSimpleName() + "";
-			_class_name = element_class.substring(package_name.length() + 1) + MODEL_INJECTOR_SUFFIX;
-            _should_serialize = should_serialize;
-		}
-	}
-	
-	private static class PresentationFragmentInjectionData {
-		private final String _package_name;
-		private final Element _variable;
-		private final String _variable_name;
-		private final String _class_name;
-		private final Map<Integer, Integer> _displays;
-		private final String _tag;
-		private final Element _implementation;
-		private final boolean _is_manually_created;
-		
-		public PresentationFragmentInjectionData(String package_name, Element variable, String element_class,
-				int[] displays, String tag, Element implementation, boolean is_manually_created) {
-			assert displays.length % 2 == 0;
-			
-			_package_name = package_name;
-			_variable = variable;
-			_variable_name = variable.getSimpleName() + "";
-			_class_name = element_class.substring(package_name.length() + 1) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
-			_implementation = implementation;
-			_is_manually_created = is_manually_created;
-			
-			if (_is_manually_created) {
-				_displays = null;
-				_tag = null;
-				return;
-			}
-			
-			final ImmutableMap.Builder<Integer, Integer> builder = ImmutableMap.builder();
-			for (int i = 0; i < displays.length; i += 2)
-				builder.put(displays[i], displays[i + 1]);
-			_displays = builder.build();
-			_tag = tag;
-		}
-	}
-
-    private static class PresentationInjectionData {
-        private final String _package_name;
-        private final Element _variable;
-        private final String _variable_name;
-        private final String _class_name;
-
-        public PresentationInjectionData(String package_name, Element variable, String element_class) {
-            _package_name = package_name;
-            _variable = variable;
-            _variable_name = variable.getSimpleName() + "";
-            _class_name = element_class.substring(package_name.length() + 1) + PRESENTATION_INJECTOR_SUFFIX;
-        }
-    }
-	
-	/** Extracts the root from a Controller following the naming convention "*Controller" */
+  /** Extracts the root from a Controller following the naming convention "*Controller" */
 	private static final Matcher _CONTROLLER_TO_ROOT = Pattern.compile("(.+)Controller").matcher("");
-	/** Qualified name for the SegueController source code */
-	private static final String _SEGUE_CONTROLLER_SOURCE = "com.imminentmeals.prestige._SegueController";
-	private static final String _DEFAULT_CONTROLLER_MODULE = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, PRODUCTION) + 
-			CONTROLLER_MODULE_SUFFIX;
-	private static final String _DEFAULT_MODEL_MODULE = CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, PRODUCTION) +
-			MODEL_MODULE_SUFFIX;
-    private static final String _CONVERTOR = "_converter";
+  private static final String _WITH_AN_IMPLEMENTATION_OF = "\twith an implementation of ";
+  private static final String _IN = "\tin ";
 	/** Counts the number of passes The Annotation Processor has performed */
 	private int _passes = 0;
 	private Elements _element_utilities;

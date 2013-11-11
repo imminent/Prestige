@@ -38,9 +38,10 @@ public abstract class SegueController {
     protected SegueController(String scope, Timber log) {
         this.scope = scope;
         this.log = log;
-        _controllers = new HashMap<Class<?>, Object>();
-        _object_graph = createObjectGraph();
-        _object_graph.inject(this);
+        _controllers = new HashMap<>();
+        /* Dependency injection object graph */
+        final ObjectGraph object_graph = createObjectGraph();
+        object_graph.inject(this);
         _presentation_controllers = bindPresentationsToControllers();
         _model_implementations = provideModelImplementations();
     }
@@ -140,9 +141,7 @@ public abstract class SegueController {
     protected final String scope;
     /**  Log where messages are written */
     protected final Timber log;
-    /** Dependency injection object graph */
-    private final ObjectGraph _object_graph;
-    /** Provides the Controller implementation for the given Presentation Implementation */
+  /** Provides the Controller implementation for the given Presentation Implementation */
     private final ImmutableMap<Class<?>, Provider> _presentation_controllers;
     /** Maintains the Controller references as they are being used */
     private final Map<Class<?>, Object> _controllers;

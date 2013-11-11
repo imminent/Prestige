@@ -105,7 +105,7 @@
   <rule ref="rulesets/codesize.xml/NcssMethodCount">
     <priority>3</priority>
     <properties>
-      <property name="minimum" value="50" />
+      <property name="minimum" value="70" />
     </properties>
   </rule>
   <rule ref="rulesets/migrating.xml/AvoidEnumAsIdentifier">
@@ -124,7 +124,7 @@
     <priority>3</priority>
   </rule>
   <rule ref="rulesets/coupling.xml/LooseCoupling">
-    <priority>3</priority>
+    <priority>5</priority>
   </rule>
   <rule ref="rulesets/controversial.xml/UnusedModifier">
     <priority>5</priority>
@@ -155,9 +155,6 @@
   </rule>
   <rule ref="rulesets/controversial.xml/DontImportSun">
     <priority>4</priority>
-  </rule>
-  <rule ref="rulesets/design.xml/PreserveStackTrace">
-    <priority>3</priority>
   </rule>
   <rule ref="rulesets/strings.xml/UseStringBufferLength">
     <priority>4</priority>

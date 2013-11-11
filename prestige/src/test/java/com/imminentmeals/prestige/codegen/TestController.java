@@ -2,45 +2,51 @@ package com.imminentmeals.prestige.codegen;
 
 import com.google.common.base.Joiner;
 import com.google.testing.compile.JavaFileObjects;
-
+import java.util.Arrays;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import java.util.Arrays;
-
-import javax.tools.JavaFileObject;
-
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 import static com.google.testing.compile.JavaSourcesSubjectFactory.javaSources;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FIVE;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.FOUR;
+import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.SIX;
 import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.prestigeProcessors;
 import static org.truth0.Truth.ASSERT;
-import static com.imminentmeals.prestige.codegen.ProcessorTestUtilities.*;
 
 @RunWith(JUnit4.class)
 public class TestController {
 
-    @Test
-    public void testControllerFailsIfMissingPresentationProtocol() {
-        final JavaFileObject protocol = JavaFileObjects.forResource("Protocol.java");
-        final JavaFileObject presentation = JavaFileObjects.forResource("PresentationWithProtocolInterface.java");
-        final JavaFileObject controller = JavaFileObjects.forResource("ControllerForPresentationWithProtocolInterface_broken.java");
+  private static final String _CONTROLLER_IMPORT =
+      "import com.imminentmeals.prestige.annotations.Controller;";
+  private static final String _BEGIN_TEST_CLASS = "public class Test {";
 
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(protocol, presentation, controller))
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@Controller is required to implement Protocol %s by its Presentation (%s)."
-                                               , "test.Protocol", "test.PresentationWithProtocolInterface"))
-              .in(controller)
-              .onLine(SIX);
-    }
+  @Test public void testControllerFailsIfMissingPresentationProtocol() {
+    final JavaFileObject protocol = JavaFileObjects.forResource("Protocol.java");
+    final JavaFileObject presentation =
+        JavaFileObjects.forResource("PresentationWithProtocolInterface.java");
+    final JavaFileObject controller =
+        JavaFileObjects.forResource("ControllerForPresentationWithProtocolInterface_broken.java");
 
-    @Test
-    public void testControllerForPresentationWithProtocol() {
-        final JavaFileObject protocol = JavaFileObjects.forResource("Protocol.java");
-        final JavaFileObject presentation = JavaFileObjects.forResource("PresentationWithProtocolInterface.java");
-        final JavaFileObject controller = JavaFileObjects.forResource("ControllerForPresentationWithProtocolInterface.java");
+    ASSERT.about(javaSources())
+        .that(Arrays.asList(protocol, presentation, controller))
+        .processedWith(prestigeProcessors())
+        .failsToCompile()
+        .withErrorContaining(String.format(
+            "@Controller is required to implement Protocol %s by its Presentation (%s)."
+            , "test.Protocol", "test.PresentationWithProtocolInterface"))
+        .in(controller)
+        .onLine(SIX);
+  }
+
+  @Test public void testControllerForPresentationWithProtocol() {
+    final JavaFileObject protocol = JavaFileObjects.forResource("Protocol.java");
+    final JavaFileObject presentation =
+        JavaFileObjects.forResource("PresentationWithProtocolInterface.java");
+    final JavaFileObject controller =
+        JavaFileObjects.forResource("ControllerForPresentationWithProtocolInterface.java");
 
         /*final JavaFileObject expected_controller_module = JavaFileObjects.forSourceString("", Joiner.on('\n').join(
             "// Generated code from Prestige. Do not modify!"
@@ -159,130 +165,130 @@ public class TestController {
               , ""
         ));*/
 
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(protocol, presentation, controller))
-              .processedWith(prestigeProcessors())
-              .compilesWithoutError();
-//              .and().generatesSources(expected_segue_controller);
-    }
+    ASSERT.about(javaSources())
+        .that(Arrays.asList(protocol, presentation, controller))
+        .processedWith(prestigeProcessors())
+        .compilesWithoutError();
+    //              .and().generatesSources(expected_segue_controller);
+  }
 
-    @Test
-    public void testControllerFailsIfNotInterface() {
-        final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
-        final JavaFileObject controller = JavaFileObjects.forSourceString("test.NotInterfaceController", Joiner.on('\n').join(
-                "package test;"
-              , "import com.imminentmeals.prestige.annotations.Controller;"
-              , "@Controller(presentation = PresentationInterface.class)"
-              , "public class NotInterfaceController{ }"
+  @Test public void testControllerFailsIfNotInterface() {
+    final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
+    final JavaFileObject controller =
+        JavaFileObjects.forSourceString("test.NotInterfaceController", Joiner.on('\n').join(
+            "package test;"
+            , _CONTROLLER_IMPORT
+            , "@Controller(presentation = PresentationInterface.class)"
+            , "public class NotInterfaceController{ }"
         ));
 
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(presentation, controller))
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@Controller annotation may only be specified on interfaces (%s)."
-                                               , "test.NotInterfaceController"))
-              .in(controller)
-              .onLine(FOUR);
-    }
+    ASSERT.about(javaSources())
+        .that(Arrays.asList(presentation, controller))
+        .processedWith(prestigeProcessors())
+        .failsToCompile()
+        .withErrorContaining(
+            String.format("@Controller annotation may only be specified on interfaces (%s)."
+                , "test.NotInterfaceController"))
+        .in(controller)
+        .onLine(FOUR);
+  }
 
-    @Test
-    public void testControllerFailsIfPackageProtected() {
-        final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
-        final JavaFileObject controller = JavaFileObjects.forSourceString("test.PackageProtectedController", Joiner.on('\n').join(
-                "package test;"
-              , "import com.imminentmeals.prestige.annotations.Controller;"
-              , "@Controller(presentation = PresentationInterface.class)"
-              , "/* package */interface PackageProtectedController { }"
+  @Test public void testControllerFailsIfPackageProtected() {
+    final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
+    final JavaFileObject controller =
+        JavaFileObjects.forSourceString("test.PackageProtectedController", Joiner.on('\n').join(
+            "package test;"
+            , _CONTROLLER_IMPORT
+            , "@Controller(presentation = PresentationInterface.class)"
+            , "/* package */interface PackageProtectedController { }"
         ));
 
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(presentation, controller))
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@Controller interface must be public (%s)."
-                                               , "test.PackageProtectedController"))
-              .in(controller)
-              .onLine(ProcessorTestUtilities.FOUR);
-    }
+    ASSERT.about(javaSources())
+        .that(Arrays.asList(presentation, controller))
+        .processedWith(prestigeProcessors())
+        .failsToCompile()
+        .withErrorContaining(String.format("@Controller interface must be public (%s)."
+            , "test.PackageProtectedController"))
+        .in(controller)
+        .onLine(ProcessorTestUtilities.FOUR);
+  }
 
-    @Test
-    public void testControllerFailsIfPrivate() {
-        final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
-        final JavaFileObject controller = JavaFileObjects.forSourceString("test.Test", Joiner.on('\n').join(
-                "package test;"
-                , "import com.imminentmeals.prestige.annotations.Controller;"
-                , "public class Test {"
-                , "@Controller(presentation = PresentationInterface.class)"
-                , "private interface PrivateController { }"
-                , "}"
+  @Test public void testControllerFailsIfPrivate() {
+    final JavaFileObject presentation = JavaFileObjects.forResource("PresentationInterface.java");
+    final JavaFileObject controller =
+        JavaFileObjects.forSourceString("test.Test", Joiner.on('\n').join(
+            "package test;"
+            , _CONTROLLER_IMPORT
+            , _BEGIN_TEST_CLASS
+            , "@Controller(presentation = PresentationInterface.class)"
+            , "private interface PrivateController { }"
+            , "}"
         ));
 
-        ASSERT.about(javaSources())
-              .that(Arrays.asList(presentation, controller))
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@Controller interface must be public (%s)."
-                                               , "test.Test.PrivateController"))
-              .in(controller)
-              .onLine(FIVE);
-    }
+    ASSERT.about(javaSources())
+        .that(Arrays.asList(presentation, controller))
+        .processedWith(prestigeProcessors())
+        .failsToCompile()
+        .withErrorContaining(String.format("@Controller interface must be public (%s)."
+            , "test.Test.PrivateController"))
+        .in(controller)
+        .onLine(FIVE);
+  }
 
-    @Test
-    public void testControllerFailsIfPresentationNotPresentation() {
-        final JavaFileObject explicit = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
-                "import com.imminentmeals.prestige.annotations.Controller;"
-              , "public class Test {"
-              , "public interface ExplicitNotAnnotatedPresentation { }"
-              , "@Controller(presentation = ExplicitNotAnnotatedPresentation.class)"
-              , "public interface ExplicitNotAnnotatedController { }"
-              , "}"
-        ));
-        final JavaFileObject implicit = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
-                "import com.imminentmeals.prestige.annotations.Controller;"
-              , "public class Test {"
-              , "public interface ImplicitNotAnnotatedPresentation { }"
-              , "@Controller"
-              , "public interface ImplicitNotAnnotatedController { }"
+  @Test public void testControllerFailsIfPresentationNotPresentation() {
+    final JavaFileObject explicit = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
+        _CONTROLLER_IMPORT
+        , _BEGIN_TEST_CLASS
+        , "public interface ExplicitNotAnnotatedPresentation { }"
+        , "@Controller(presentation = ExplicitNotAnnotatedPresentation.class)"
+        , "public interface ExplicitNotAnnotatedController { }"
+        , "}"
+    ));
+    final JavaFileObject implicit = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
+        _CONTROLLER_IMPORT
+        , _BEGIN_TEST_CLASS
+        , "public interface ImplicitNotAnnotatedPresentation { }"
+        , "@Controller"
+        , "public interface ImplicitNotAnnotatedController { }"
 
-              , "}"
-        ));
+        , "}"
+    ));
 
-        ASSERT.about(javaSource())
-              .that(explicit)
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("@Controller Presentation must be an @Presentation (%s)."
-                                               , "Test.ExplicitNotAnnotatedPresentation"))
-              .in(explicit)
-              .onLine(FIVE);
+    ASSERT.about(javaSource())
+        .that(explicit)
+        .processedWith(prestigeProcessors())
+        .failsToCompile()
+        .withErrorContaining(String.format("@Controller Presentation must be an @Presentation (%s)."
+            , "Test.ExplicitNotAnnotatedPresentation"))
+        .in(explicit)
+        .onLine(FIVE);
 
-        ASSERT.about(javaSource())
-              .that(implicit)
-              .processedWith(prestigeProcessors())
-              .failsToCompile()
-              .withErrorContaining(String.format("No @Presentation-annotated %s found, implicitly required by %s"
-                                               , "ImplicitNotAnnotatedPresentation", "Test.ImplicitNotAnnotatedController"))
-              .in(implicit)
-              .onLine(FIVE);
-    }
+    ASSERT.about(javaSource())
+        .that(implicit)
+        .processedWith(prestigeProcessors())
+        .failsToCompile()
+        .withErrorContaining(
+            String.format("No @Presentation-annotated %s found, implicitly required by %s"
+                , "ImplicitNotAnnotatedPresentation", "Test.ImplicitNotAnnotatedController"))
+        .in(implicit)
+        .onLine(FIVE);
+  }
 
-    @Test
-    public void testControllerWithImplicitPresentation() {
-        final JavaFileObject source = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
-                "import com.imminentmeals.prestige.annotations.Controller;"
-              , "import com.imminentmeals.prestige.annotations.Presentation;"
-              , "public class Test {"
-              , "@Presentation"
-              , "public interface ImplicitlyDefinedPresentation { }"
-              , "@Controller"
-              , "public interface ImplicitlyDefinedController { }"
-              , "}"
-        ));
+  @Test public void testControllerWithImplicitPresentation() {
+    final JavaFileObject source = JavaFileObjects.forSourceString("Test", Joiner.on('\n').join(
+        _CONTROLLER_IMPORT
+        , "import com.imminentmeals.prestige.annotations.Presentation;"
+        , _BEGIN_TEST_CLASS
+        , "@Presentation"
+        , "public interface ImplicitlyDefinedPresentation { }"
+        , "@Controller"
+        , "public interface ImplicitlyDefinedController { }"
+        , "}"
+    ));
 
-        ASSERT.about(javaSource())
-                .that(source)
-                .processedWith(prestigeProcessors())
-                .compilesWithoutError();
-    }
+    ASSERT.about(javaSource())
+        .that(source)
+        .processedWith(prestigeProcessors())
+        .compilesWithoutError();
+  }
 }
