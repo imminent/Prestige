@@ -1,6 +1,7 @@
 package com.imminentmeals.prestige.codegen;
 
 import android.annotation.SuppressLint;
+
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -16,10 +17,7 @@ import com.imminentmeals.prestige.Prestige;
 import com.imminentmeals.prestige.SegueController;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.javawriter.JavaWriter;
-import dagger.Lazy;
-import dagger.Module;
-import dagger.ObjectGraph;
-import dagger.Provides;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
@@ -29,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
 import javax.annotation.Nonnull;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -43,6 +42,11 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.JavaFileObject;
+
+import dagger.Lazy;
+import dagger.Module;
+import dagger.ObjectGraph;
+import dagger.Provides;
 import timber.log.Timber;
 
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
@@ -115,12 +119,20 @@ import static javax.tools.Diagnostic.Kind.ERROR;
       }
 
       // Generates the *ModelModules
+      final boolean has_default_models = model_implementations.containsKey(PRODUCTION);
+      String default_model_module = null;
+      if (has_default_models)
+        for (ModuleData model_module : model_modules)
+          if (model_module.class_name.equals(_DEFAULT_MODEL_MODULE)) {
+            default_model_module = model_module.qualified_name;
+            break;
+          }
       for (ModuleData model_module : model_modules) {
         source_code = _filer.createSourceFile(model_module.qualified_name, (Element) null);
         writer = source_code.openWriter();
         writer.flush();
         generateModelModule(writer, model_module.package_name, (List<ModelData>) model_module.components,
-            model_module.class_name);
+            model_module.class_name, has_default_models, default_model_module);
       }
 
       // Generates the $$ModelInjectors
@@ -486,32 +498,37 @@ import static javax.tools.Diagnostic.Kind.ERROR;
    * @param models
    * @param class_name
    */
-  private void generateModelModule(Writer writer, String package_name, List<ModelData> models, String class_name)
+  private void generateModelModule(Writer writer, String package_name, List<ModelData> models, String class_name
+          , boolean has_default_models, String default_model_module)
       throws IOException {
     final String file_tested = "_file_tested";
     final EnumSet<Modifier> private_final = EnumSet.of(PRIVATE, FINAL);
     final EnumSet<Modifier> private_modifier = EnumSet.of(PRIVATE);
     final JavaWriter java_writer = new JavaWriter(writer);
+    final boolean is_default_module = !class_name.equals(_DEFAULT_MODEL_MODULE);
     java_writer.setCompressingTypes(true);
     java_writer.emitSingleLineComment(_HEADER_COMMENT)
         .emitPackage(package_name)
         .emitImports(_SEGUE_CONTROLLER_CLASS,
-            "dagger.Module",
-            "dagger.Provides",
-            "javax.inject.Singleton",
-            JavaWriter.type(Gson.class),
-            JavaWriter.type(GsonProvider.class),
-            JavaWriter.type(GsonConverter.class),
-            JavaWriter.type(InputStream.class),
-            JavaWriter.type(IOException.class),
-            JavaWriter.type(Named.class),
-            JavaWriter.type(ExclusionStrategy.class),
-            JavaWriter.type(FieldAttributes.class),
-            JavaWriter.type(InstanceCreator.class),
-            JavaWriter.type(Set.class),
-            JavaWriter.type(SegueController.class))
-        .emitStaticImports(JavaWriter.type(Sets.class) + ".newHashSet")
-        .emitEmptyLine();
+                "dagger.Module",
+                "dagger.Provides",
+                "javax.inject.Singleton",
+                JavaWriter.type(Gson.class),
+                JavaWriter.type(GsonProvider.class),
+                JavaWriter.type(GsonConverter.class),
+                JavaWriter.type(InputStream.class),
+                JavaWriter.type(IOException.class),
+                JavaWriter.type(Named.class),
+                JavaWriter.type(ExclusionStrategy.class),
+                JavaWriter.type(FieldAttributes.class),
+                JavaWriter.type(InstanceCreator.class),
+                JavaWriter.type(Set.class),
+                JavaWriter.type(SegueController.class))
+        .emitStaticImports(JavaWriter.type(Sets.class) + ".newHashSet"
+                , JavaWriter.type(Sets.class) + ".union");
+    if (has_default_models && is_default_module)
+        java_writer.emitStaticImports(default_model_module + ".default_models");
+    java_writer.emitEmptyLine();
     java_writer.emitJavadoc("<p>Module for injecting:\n" +
         "<ul>\n" +
         "%s" +
@@ -521,11 +538,21 @@ import static javax.tools.Diagnostic.Kind.ERROR;
             "{\n" +
                 "_SegueController.class" +
                 "\n}",
-            "overrides", !class_name.equals(_DEFAULT_MODEL_MODULE),
+            "overrides", is_default_module,
             "library", true,
             "complete", false))
-        .beginType(class_name, _CLASS, EnumSet.of(PUBLIC))
-        .emitEmptyLine()
+        .beginType(class_name, _CLASS, EnumSet.of(PUBLIC));
+    final List<String> model_exclusions = newArrayListWithCapacity(models.size());
+    final String model_exclusion = "(Class) %s.class";
+      
+    if (class_name.equals(_DEFAULT_MODEL_MODULE)) {
+      for (ModelData model : models) model_exclusions.add(String.format(model_exclusion, model.contract));
+      java_writer.emitJavadoc("Set of production models")
+                 .emitField(JavaWriter.type(Set.class, JavaWriter.type(Class.class)), "default_models"
+                 , EnumSet.of(PUBLIC, STATIC, FINAL)
+                 , "newHashSet(" + Joiner.on(",\n\t\t").join(model_exclusions) + ")");
+    }
+    java_writer.emitEmptyLine()
         .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log"
             , JavaWriter.type(SegueController.class), _SEGUE_CONTROLLER)
         .emitStatement("this.log = log")
@@ -611,10 +638,8 @@ import static javax.tools.Diagnostic.Kind.ERROR;
         .beginMethod(JavaWriter.type(Gson.class), "buildGson", EnumSet.of(PRIVATE)
             , JavaWriter.type(GsonBuilder.class), "gson_builder");
     final Joiner new_line_joiner = Joiner.on("%n");
-    final List<String> model_exclusions = newArrayListWithCapacity(models.size());
-    final String model_exclusion = "(Class) %s.class";
     for (ModelData model : models) {
-      model_exclusions.add(String.format(model_exclusion, model.contract));
+      if (is_default_module) model_exclusions.add(String.format(model_exclusion, model.contract));
       if (model.should_serialize) {
         java_writer.emitStatement("final InstanceCreator<%1$s> %1$s_creator = _segue_controller.instanceCreator(%2$s.class)"
             , java_writer.compressType(model.implementation + ""), model.contract)
@@ -630,7 +655,10 @@ import static javax.tools.Diagnostic.Kind.ERROR;
         , "    public boolean shouldSkipClass(Class<?> _) {"
         , "      return false;"
         , "    }"
-        , "    private final Set<Class> _models = newHashSet(%s);"
+        , "    private final Set<Class> _models = "
+          + (class_name.equals(_DEFAULT_MODEL_MODULE)
+            ? "default_models;"
+            : (has_default_models? "union(" + "default_models, newHashSet(%s));" : "newHashSet(%s);"))
         , "})"), Joiner.on(",\n\t\t").join(model_exclusions))
         .emitStatement("return gson_builder.create()")
         .endMethod()
