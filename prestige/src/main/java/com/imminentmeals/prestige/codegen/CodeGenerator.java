@@ -518,7 +518,8 @@ import static javax.tools.Diagnostic.Kind.ERROR;
                 JavaWriter.type(FieldAttributes.class),
                 JavaWriter.type(InstanceCreator.class),
                 JavaWriter.type(Set.class),
-                JavaWriter.type(SegueController.class))
+                JavaWriter.type(SegueController.class),
+                JavaWriter.type(Timber.class))
         .emitStaticImports(JavaWriter.type(Sets.class) + ".newHashSet"
                 , JavaWriter.type(Sets.class) + ".union");
     if (has_default_models && is_default_module)
