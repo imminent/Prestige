@@ -106,15 +106,13 @@ public final class Prestige {
    * implementation scope specifies which version of implementations to use.</p>
    *
    * @param scope The implementation scope
-   * @return The Segue Controller
    */
   public static void conjureSegueController(String scope) {
     try {
       final Class<?> segue_controller =
           Class.forName("com.imminentmeals.prestige._SegueController");
       _segue_controller =
-          (SegueController) segue_controller.getConstructor(String.class, Timber.class)
-              .newInstance(scope);
+          (SegueController) segue_controller.getConstructor(String.class).newInstance(scope);
     } catch (IllegalArgumentException | SecurityException | InstantiationException
         | IllegalAccessException | NoSuchMethodException exception) {
       throw new UnableToConjureSegueControllerException("Error while conjuring Segue Controller"
