@@ -1,5 +1,4 @@
 //apply plugin: 'sonar-runner'
-apply plugin: 'idea'
 
 def isReleaseBuild() {
     return version.contains("SNAPSHOT") == false
@@ -17,15 +16,12 @@ allprojects {
         }
     }
 
-    // WORKAROUND: complains about characters not mapping to ASCII, but options.encoding is deprecated
     tasks.withType(Compile) {
+      // WORKAROUND: complains about characters not mapping to ASCII, but options.encoding is deprecated
         options.encoding = "UTF-8"
+        // Lint set up
+        options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
     }
-
-  // Lint set up
-  tasks.withType(Compile) {
-    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
-  }
 }
 
 // Sets up Sonar plugin

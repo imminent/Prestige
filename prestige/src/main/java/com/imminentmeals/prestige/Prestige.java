@@ -26,7 +26,7 @@ import static java.lang.String.format;
  *
  * @author Dandre Allison
  */
-@ParametersAreNonnullByDefault
+@SuppressWarnings("UnusedDeclaration") @ParametersAreNonnullByDefault
 public final class Prestige {
 
   /* package */static final String _TAG = "Prestige";
