@@ -21,6 +21,11 @@ allprojects {
     tasks.withType(Compile) {
         options.encoding = "UTF-8"
     }
+
+  // Lint set up
+  tasks.withType(Compile) {
+    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+  }
 }
 
 // Sets up Sonar plugin

@@ -97,7 +97,7 @@ public final class Prestige {
     if (_segue_controller == null) {
       throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "send message"));
     }
-    _segue_controller.timber().tag(_TAG).d("Sending message to controller: " + message);
+    Timber.d("Sending message to controller: " + message);
     _segue_controller.sendMessage(message);
   }
 
@@ -109,24 +109,12 @@ public final class Prestige {
    * @return The Segue Controller
    */
   public static void conjureSegueController(String scope) {
-    conjureSegueController(scope, Timber.PROD);
-  }
-
-  /**
-   * <p>Creates the {@link SegueController} set for the given implementation scope. The
-   * implementation scope specifies which version of implementations to use.</p>
-   *
-   * @param scope The implementation scope
-   * @param log The log where messages are written
-   * @return The Segue Controller
-   */
-  public static void conjureSegueController(String scope, Timber log) {
     try {
       final Class<?> segue_controller =
           Class.forName("com.imminentmeals.prestige._SegueController");
       _segue_controller =
           (SegueController) segue_controller.getConstructor(String.class, Timber.class)
-              .newInstance(scope, log);
+              .newInstance(scope);
     } catch (IllegalArgumentException | SecurityException | InstantiationException
         | IllegalAccessException | NoSuchMethodException exception) {
       throw new UnableToConjureSegueControllerException("Error while conjuring Segue Controller"
@@ -136,8 +124,8 @@ public final class Prestige {
           , exception.getTargetException());
     } catch (ClassNotFoundException exception) {
       throw new UnableToConjureSegueControllerException(
-            "Generated _SegueController cannot be found. Was Prestige annotation processor "
-          + "executed? Was it removed by ProGuard?", exception);
+          "Generated _SegueController cannot be found. Was Prestige annotation processor "
+              + "executed? Was it removed by ProGuard?", exception);
     }
   }
 
@@ -229,23 +217,8 @@ public final class Prestige {
    */
   @TargetApi(ICE_CREAM_SANDWICH)
   public static void materialize(Application application, String scope) {
-    materialize(application, scope, Timber.PROD);
-  }
-
-  /**
-   * <p>Materializes Prestige for the given scope and binds it to the Activity lifecycles in the
-   * given Application. This is equivalent to how you would use {@link
-   * #conjureSegueController(String, Timber)} and {@link Prestige#activityLifecycleCallbacks()} in
-   * most cases.</p>
-   *
-   * @param application The application using Prestige
-   * @param scope The implementation scope
-   * @param log The log where messages are written
-   */
-  @TargetApi(ICE_CREAM_SANDWICH)
-  public static void materialize(Application application, String scope, Timber log) {
     application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks());
-    conjureSegueController(scope, log);
+    conjureSegueController(scope);
   }
 
   /**
@@ -447,10 +420,6 @@ public final class Prestige {
   }
 
 /* Private Helpers */
-  private static void logProblemWithSetup(Throwable exception, Timber log) {
-    log.tag(_TAG).e(exception, "Problem with Prestige setup");
-  }
-
   private static void injectModelsForClass(Object target, Class target_class) {
     try {
       final Method inject;

@@ -35,9 +35,8 @@ public abstract class SegueController {
     /* package */Bus controller_bus;
 
 /* Constructor */
-    protected SegueController(String scope, Timber log) {
+    protected SegueController(String scope) {
         this.scope = scope;
-        this.log = log;
         _controllers = new HashMap<>();
         /* Dependency injection object graph */
         final ObjectGraph object_graph = createObjectGraph();
@@ -58,7 +57,7 @@ public abstract class SegueController {
 /* Public API */
     @SuppressWarnings("unchecked")
     @Nonnull public <T> T dataSource(Class<?> target) {
-        log.tag(_TAG).d("Injecting " + _controllers.get(target) + " into " + target);
+        Timber.d("Injecting " + _controllers.get(target) + " into " + target);
         return (T) _controllers.get(target);
     }
 
@@ -80,7 +79,7 @@ public abstract class SegueController {
         final Class<?> activity_class = activity.getClass();
         if (!_presentation_controllers.containsKey(activity_class)) return;
 
-        log.tag(_TAG).d("Vanishing " + _controllers.get(activity_class) + "(for " + activity + ")");
+        Timber.d("Vanishing " + _controllers.get(activity_class) + "(for " + activity + ")");
         _controllers.remove(activity_class);
     }
 
@@ -92,7 +91,7 @@ public abstract class SegueController {
     public void attachPresentationFragment(Activity activity, Object presentation_fragment, String tag) {
         final Object controller = _controllers.get(activity.getClass());
         if (controller != null) {
-            log.tag(_TAG).d("Attaching " + presentation_fragment + " to " + controller + " (for " + activity + ")");
+            Timber.d("Attaching " + presentation_fragment + " to " + controller + " (for " + activity + ")");
             Prestige.attachPresentationFragment(controller, presentation_fragment, tag);
         }
     }
@@ -101,7 +100,7 @@ public abstract class SegueController {
         final Class<?> activity_class = activity.getClass();
         if (!_controllers.containsKey(activity_class)) return;
 
-        log.tag(_TAG).d("Registering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
+        Timber.d("Registering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
         controller_bus.register(_controllers.get(activity_class));
     }
 
@@ -109,23 +108,19 @@ public abstract class SegueController {
         final Class<?> activity_class = activity.getClass();
         if (!_controllers.containsKey(activity_class)) return;
 
-        log.tag(_TAG).d("Unregistering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
+        Timber.d("Unregistering " + _controllers.get(activity_class) + " to receive messages (for " + activity + ")");
         controller_bus.unregister(_controllers.get(activity_class));
-    }
-
-    @Nonnull public Timber timber() {
-        return log;
     }
 
     public void storeController(Activity activity) {
         final Class<?> activity_class = activity.getClass();
         if (!_controllers.containsKey(activity_class)) return;
 
-        log.tag(_TAG).d("Storing controller " + _controllers.get(activity_class) + " (for " + activity + ")");
+        Timber.d("Storing controller " + _controllers.get(activity_class) + " (for " + activity + ")");
         try {
             Prestige.store(_controllers.get(activity_class));
         } catch (IOException exception) {
-            log.tag(_TAG).d(exception, "Error storing controller" + _controllers.get(activity_class));
+            Timber.d(exception, "Error storing controller" + _controllers.get(activity_class));
         }
     }
 
@@ -139,8 +134,6 @@ public abstract class SegueController {
 
     /**  The current scope */
     protected final String scope;
-    /**  Log where messages are written */
-    protected final Timber log;
   /** Provides the Controller implementation for the given Presentation Implementation */
     private final ImmutableMap<Class<?>, Provider> _presentation_controllers;
     /** Maintains the Controller references as they are being used */

@@ -183,11 +183,7 @@ import static javax.tools.Diagnostic.Kind.ERROR;
     } catch (IOException exception) {
       _messager.printMessage(ERROR, exception.getMessage());
     } finally {
-      try {
-        Closeables.close(writer, writer != null);
-      } catch (IOException exception) {
-        _messager.printMessage(ERROR, exception.getMessage());
-      }
+      try { Closeables.close(writer, writer != null); } catch (IOException ignored) { }
     }
   }
 
@@ -246,9 +242,8 @@ import static javax.tools.Diagnostic.Kind.ERROR;
     java_writer.emitEmptyLine()
         .emitJavadoc("<p>Constructs a {@link SegueController}.</p>")
         .beginMethod(null, _SEGUE_CONTROLLER_CLASS, public_modifier,
-            JavaWriter.type(String.class), "scope",
-            JavaWriter.type(Timber.class), "log")
-        .emitStatement("super(scope, log)")
+            JavaWriter.type(String.class), "scope")
+        .emitStatement("super(scope)")
         .endMethod();
 
     // SegueController Contract
@@ -281,11 +276,11 @@ import static javax.tools.Diagnostic.Kind.ERROR;
       String production_module = null;
       for (ModuleData model_module : model_modules)
         if (model_module.scope.equals(Implementations.PRODUCTION)) {
-          production_module = String.format(Locale.US, "modules.add(new %s(log, this))", model_module.qualified_name);
+          production_module = String.format(Locale.US, "modules.add(new %s(this))", model_module.qualified_name);
         } else {
           java_writer.beginControlFlow(String.format(Locale.US, "%s (scope.equals(\"%s\"))"
               , if_else_if_control, model_module.scope))
-              .emitStatement("modules.add(new %s(log, this))", model_module.qualified_name)
+              .emitStatement("modules.add(new %s(this))", model_module.qualified_name)
               .endControlFlow();
           if_else_if_control = else_if;
         }
@@ -348,7 +343,7 @@ import static javax.tools.Diagnostic.Kind.ERROR;
 
       nested_if_else_if = "if";
       java_writer.beginControlFlow(String.format("%s (object instanceof %s)", if_else_if_control, model.contract))
-          .emitStatement("log.tag(_TAG).d(\"Storing \" + object)")
+          .emitStatement("Timber.d(\"Storing \" + object)")
           .emitStatement("%s%s.get().toStream(object, gson_provider.get().outputStreamFor(%s.class))"
               , model.variable_name, _CONVERTOR, model.contract);
 
@@ -553,9 +548,8 @@ import static javax.tools.Diagnostic.Kind.ERROR;
                  , "newHashSet(" + Joiner.on(",\n\t\t").join(model_exclusions) + ")");
     }
     java_writer.emitEmptyLine()
-        .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(Timber.class), "log"
-            , JavaWriter.type(SegueController.class), _SEGUE_CONTROLLER)
-        .emitStatement("this.log = log")
+        .beginMethod(null, class_name, EnumSet.of(PUBLIC), JavaWriter.type(SegueController.class)
+            , _SEGUE_CONTROLLER)
         .emitStatement("_segue_controller = segue_controller")
         .endMethod()
         .emitEmptyLine()
@@ -598,7 +592,7 @@ import static javax.tools.Diagnostic.Kind.ERROR;
             .beginControlFlow(String.format("if (!_%s%s)", model.variable_name, file_tested))
             .emitStatement("_%s%s = true", model.variable_name, file_tested)
             .emitStatement("input_stream = gson_provider.inputStreamFor(%s.class)", model.contract)
-            .emitStatement("log.tag(_TAG).d(\"Restoring %s from input stream\")", java_writer.compressType(model.implementation
+            .emitStatement("Timber.d(\"Restoring %s from input stream\")", java_writer.compressType(model.implementation
                 + ""))
             .emitStatement("return (%s) converter.from(input_stream)", java_writer.compressType(model.implementation
                 + ""))
@@ -606,7 +600,7 @@ import static javax.tools.Diagnostic.Kind.ERROR;
             .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
             .endControlFlow()
             .nextControlFlow("catch (Exception _)")
-            .emitStatement("log.tag(_TAG).d(\"Nothing to restore; creating model %s\")", model.contract)
+            .emitStatement("Timber.d(\"Nothing to restore; creating model %s\")", model.contract)
             .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
             .nextControlFlow("finally")
             .beginControlFlow("if (input_stream != null)")
@@ -664,7 +658,6 @@ import static javax.tools.Diagnostic.Kind.ERROR;
         .endMethod()
         .emitEmptyLine()
         .emitJavadoc("Log where messages are written")
-        .emitField(JavaWriter.type(Timber.class), "log", private_final)
         .emitField(JavaWriter.type(String.class), "_TAG", EnumSet.of(PRIVATE, STATIC, FINAL), stringLiteral("Prestige"))
         .emitJavadoc("Segue Controller")
         .emitField(JavaWriter.type(SegueController.class), "_segue_controller", private_final);
