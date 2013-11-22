@@ -1,27 +1,21 @@
 package com.imminentmeals.prestige;
 
 import android.app.Activity;
-
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.InstanceCreator;
 import com.squareup.otto.Bus;
-
+import dagger.Lazy;
+import dagger.ObjectGraph;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
-
 import javax.annotation.Nonnull;
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
-
-import dagger.Lazy;
-import dagger.ObjectGraph;
 import timber.log.Timber;
-
-import static com.imminentmeals.prestige.Prestige._TAG;
 
 /**
  *
@@ -30,8 +24,7 @@ import static com.imminentmeals.prestige.Prestige._TAG;
 @ParametersAreNonnullByDefault
 public abstract class SegueController {
     /** Bus over which Presentations communicate to their Controllers */
-    @Inject
-    @Named(com.imminentmeals.prestige.ControllerContract.BUS)
+    @Inject @Named(com.imminentmeals.prestige.ControllerContract.BUS)
     /* package */Bus controller_bus;
 
 /* Constructor */
