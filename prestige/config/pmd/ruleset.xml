@@ -105,7 +105,7 @@
   <rule ref="rulesets/codesize.xml/NcssMethodCount">
     <priority>3</priority>
     <properties>
-      <property name="minimum" value="70" />
+      <property name="minimum" value="75" />
     </properties>
   </rule>
   <rule ref="rulesets/migrating.xml/AvoidEnumAsIdentifier">

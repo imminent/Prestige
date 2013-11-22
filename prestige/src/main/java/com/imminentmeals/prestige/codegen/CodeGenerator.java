@@ -1,7 +1,6 @@
 package com.imminentmeals.prestige.codegen;
 
 import android.annotation.SuppressLint;
-
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -17,7 +16,11 @@ import com.imminentmeals.prestige.Prestige;
 import com.imminentmeals.prestige.SegueController;
 import com.imminentmeals.prestige.annotations.meta.Implementations;
 import com.squareup.javawriter.JavaWriter;
-
+import com.squareup.otto.Bus;
+import dagger.Lazy;
+import dagger.Module;
+import dagger.ObjectGraph;
+import dagger.Provides;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
@@ -27,7 +30,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation.Nonnull;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -42,11 +44,6 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.JavaFileObject;
-
-import dagger.Lazy;
-import dagger.Module;
-import dagger.ObjectGraph;
-import dagger.Provides;
 import timber.log.Timber;
 
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
@@ -567,11 +564,17 @@ import static javax.tools.Diagnostic.Kind.ERROR;
           .emitAnnotation(Singleton.class);
       String[] provider_parameters = model.should_serialize
           ? new String[] {
-          JavaWriter.type(GsonProvider.class)
+            JavaWriter.type(GsonProvider.class)
           , "gson_provider"
           , "@Named(" + stringLiteral(model.contract + "")+ ") " + JavaWriter.type(GsonConverter.class)
-          , "converter" }
-          : new String[0];
+          , "converter"
+          // TODO: could only do this and register if implementation has @Produce methods
+          , "@Named(com.imminentmeals.prestige.ControllerContract.BUS) " + JavaWriter.type(Bus.class)
+          , "controller_bus" }
+          : new String[] {
+            "@Named(com.imminentmeals.prestige.ControllerContract.BUS) " + JavaWriter.type(Bus.class)
+          , "controller_bus"
+          };
       final String[] new_instance_format_parameters;
       if (model.parameters == null || model.parameters.isEmpty()) {
         new_instance_format_parameters = new String[] { java_writer.compressType(model.implementation
@@ -589,25 +592,32 @@ import static javax.tools.Diagnostic.Kind.ERROR;
           EnumSet.noneOf(Modifier.class), provider_parameters);
       if (model.should_serialize) {
         java_writer.emitStatement("InputStream input_stream = null")
+            .emitStatement("%s model", java_writer.compressType(model.implementation + ""))
             .beginControlFlow("try")
             .beginControlFlow(String.format("if (!_%s%s)", model.variable_name, file_tested))
             .emitStatement("_%s%s = true", model.variable_name, file_tested)
             .emitStatement("input_stream = gson_provider.inputStreamFor(%s.class)", model.contract)
             .emitStatement("Timber.d(\"Restoring %s from input stream\")", java_writer.compressType(model.implementation
                 + ""))
-            .emitStatement("return (%s) converter.from(input_stream)", java_writer.compressType(model.implementation
+            .emitStatement("model = (%s) converter.from(input_stream)", java_writer.compressType(model.implementation
                 + ""))
+            .emitStatement("controller_bus.register(model)")
+            .emitStatement("return model")
             .nextControlFlow("else")
-            .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
+            .emitStatement("model = new %s(%s)", (Object[]) new_instance_format_parameters)
+            .emitStatement("controller_bus.register(model)")
+            .emitStatement("return model")
             .endControlFlow()
             .nextControlFlow("catch (Exception _)")
             .emitStatement("Timber.d(\"Nothing to restore; creating model %s\")", model.contract)
-            .emitStatement("return new %s(%s)", (Object[]) new_instance_format_parameters)
+            .emitStatement("model = new %s(%s)", (Object[]) new_instance_format_parameters)
+            .emitStatement("controller_bus.register(model)")
+            .emitStatement("return model")
             .nextControlFlow("finally")
             .beginControlFlow("if (input_stream != null)")
             .beginControlFlow("try")
             .emitStatement("input_stream.close()")
-            .nextControlFlow("catch (IOException _)")
+            .nextControlFlow("catch (IOException ignored)")
             .endControlFlow()
             .endControlFlow()
             .endControlFlow()

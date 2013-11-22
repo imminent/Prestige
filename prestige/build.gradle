@@ -38,6 +38,7 @@ tasks.withType(FindBugs) {
 
 // Sets up pmd plugin
 pmd {
+  ruleSets = []
   ruleSetFiles = files("$project.projectDir/config/pmd/ruleset.xml")
 }
 
