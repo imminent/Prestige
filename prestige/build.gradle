@@ -11,7 +11,7 @@ dependencies {
   compile 'com.google.android:annotations:4.1.1.4'
 
   compile 'com.squareup:javawriter:2.2.0'
-  compile 'com.squareup.dagger:dagger:1.1.0'
+  compile 'com.squareup.dagger:dagger:1.2.0'
   compile 'com.squareup:otto:1.3.4'
   compile 'com.jakewharton.timber:timber:2.0.0'
 
