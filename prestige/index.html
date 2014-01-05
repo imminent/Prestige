@@ -1,0 +1,67 @@
+---
+layout: default
+title: Prestige
+repository: http://github.com/imminent/Prestige
+description: Code generation-driven MVC-pattern for Android
+---
+<div class="row">
+  <div class="span9">
+    <h3 id="pledge">The Pledge</h3>
+
+    <p>...</p>
+
+    <h3 id="turn">The Turn</h3>
+    <p>While "magic is for children", sometimes careful planning can turn the oridinary into something magical.</p>
+
+    <h3 id="prestige">The Prestige</h3>
+
+    <p>With `Prestige.conjureSegueController(String)` and an `Application` that implements `SegueControllerApplication`, you are able to create the Controllers and inject Data Sources using `Prestige.conjureController(Activity)` and `@InjectDataSource`. You should make sure to `Prestige.vansihController(Activity)` when the `Activity` is destroyed. This setup can be done in an `Application.ActivityLifecycleCallbacks`</p>
+
+    {% highlight java %}
+    public class PrestigeCallbacks implements Application.ActivityLifecycleCallbacks {
+      @Override public void onActivityCreated(Activity activity, Bundle _) {
+        Prestige.conjureController(activity);
+      }
+
+      @Override public void onActivityDestroyed(Activity activity) {
+        Prestige.vanishController(activity);
+      }
+
+      // … Remaining methods are empty
+    }
+    {% endhighlight %}
+
+    <h3 id="download">Download</h3>
+    
+    <p><a href="http://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=com.imminentmeals&a=dprestige&v=LATEST" class="dl core-version-href">&darr; <span class="version-tag">Latest</span> JAR</a></p>
+
+    <h3 id="license">License</h3>
+    <pre>Copyright 2013 ImminentMeals
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.</pre>
+  </div>
+  <div class="span3">
+    <div class="content-nav" data-spy="affix" data-offset-top="80">
+      <ul class="nav nav-tabs nav-stacked primary">
+        <li><a href="#pledge">The Pledge</a></li>
+        <li><a href="#turn">The Turn</a></li>
+        <li><a href="#prestige">The Prestige</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="#license">License</a></li>
+      </ul>
+      <ul class="nav nav-pills nav-stacked secondary">
+        <li><a href="javadoc/index.html">Javadoc</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
