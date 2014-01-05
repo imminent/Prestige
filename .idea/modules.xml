@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/Prestige-Parent.iml" filepath="$PROJECT_DIR$/Prestige-Parent.iml" />
+      <module fileurl="file://$PROJECT_DIR$/prestige/prestige.iml" filepath="$PROJECT_DIR$/prestige/prestige.iml" />
+      <module fileurl="file://$PROJECT_DIR$/prestige-example/prestige-example.iml" filepath="$PROJECT_DIR$/prestige-example/prestige-example.iml" />
+    </modules>
+  </component>
+</project>
+

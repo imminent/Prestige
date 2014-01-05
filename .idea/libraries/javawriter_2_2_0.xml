@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="javawriter-2.2.0">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/artifacts-26/filestore/com.squareup/javawriter/2.2.0/jar/1f44e65d5c9a3155024eff02c119bdb8f84b7a9d/javawriter-2.2.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/artifacts-26/filestore/com.squareup/javawriter/2.2.0/source/6ee15805c858b74416165a931802f9a2e34ffa4f/javawriter-2.2.0-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
