@@ -15,7 +15,7 @@ description: Code generation-driven MVC-pattern for Android
 
     <h3 id="prestige">The Prestige</h3>
 
-    <p>With `Prestige.conjureSegueController(String)` and an `Application` that implements `SegueControllerApplication`, you are able to create the Controllers and inject Data Sources using `Prestige.conjureController(Activity)` and `@InjectDataSource`. You should make sure to `Prestige.vansihController(Activity)` when the `Activity` is destroyed. This setup can be done in an `Application.ActivityLifecycleCallbacks`</p>
+    <p>With <code>Prestige.conjureSegueController(String)</code> and an <code>Application</code> that implements <code>SegueControllerApplication</code>, you are able to create the Controllers and inject Data Sources using <code>Prestige.conjureController(Activity)</code> and <code>@InjectDataSource</code>. You should make sure to <code>Prestige.vansihController(Activity)</code> when the <code>Activity</code> is destroyed. This setup can be done in an <code>Application.ActivityLifecycleCallbacks</code></p>
 
     {% highlight java %}
     public class PrestigeCallbacks implements Application.ActivityLifecycleCallbacks {
