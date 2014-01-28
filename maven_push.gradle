@@ -68,9 +68,16 @@ afterEvaluate { project ->
     classifier = 'sources'
   }
 
+  task apiJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'api'
+    exclude '**/codegen/**'
+  }
+
   artifacts {
     //archives packageReleaseJar
     archives sourcesJar
     archives javadocsJar
+    archives apiJar
   }
 }

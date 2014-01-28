@@ -22,9 +22,12 @@ public class ExampleApplication extends Application {
 	@Override public void onCreate() {
 		super.onCreate();
 
-		Prestige.materialize(this, scope(), _LOG);
+		Prestige.materialize(this, scope());
     Prestige.injectModels(this);
-    if (BuildConfig.DEBUG) _tools.setupAndroidCodeWarnings();
+    if (BuildConfig.DEBUG) {
+      _tools.setupAndroidCodeWarnings();
+      Timber.plant(new Timber.DebugTree());
+    }
     _storage_model.selfStorageFacility(new SelfStorageFacility(this));
 
     registerActivityLifecycleCallbacks(new InjectionCallbacks());
@@ -39,5 +42,4 @@ public class ExampleApplication extends Application {
   }
 
   private static final String _IMPLEMENTATION_SCOPE = BuildConfig.DEBUG? DEVELOPMENT : PRODUCTION;
-  private static final Timber _LOG = BuildConfig.DEBUG? Timber.DEBUG : Timber.PROD;
 }
