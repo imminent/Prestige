@@ -1,6 +1,7 @@
 package com.imminentmeals.prestige.codegen;
 
 import javax.lang.model.element.Element;
+
 import static com.imminentmeals.prestige.codegen.AnnotationProcessor.MODEL_INJECTOR_SUFFIX;
 
 /* package */ class ModelInjectionData {
@@ -12,6 +13,7 @@ import static com.imminentmeals.prestige.codegen.AnnotationProcessor.MODEL_INJEC
 
   /**
    * <p>Constructs a {@link ModelInjectionData}.</p>
+   *
    * @param variable The variable in which to inject the Model
    */
   public ModelInjectionData(String package_name, Element variable, String element_class,
@@ -20,6 +22,6 @@ import static com.imminentmeals.prestige.codegen.AnnotationProcessor.MODEL_INJEC
     this.variable = variable;
     variable_name = variable.getSimpleName() + "";
     class_name = element_class.substring(package_name.length() + 1) + MODEL_INJECTOR_SUFFIX;
-this.should_serialize = should_serialize;
+    this.should_serialize = should_serialize;
   }
 }

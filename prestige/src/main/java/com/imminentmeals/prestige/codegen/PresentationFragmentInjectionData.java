@@ -1,7 +1,7 @@
 package com.imminentmeals.prestige.codegen;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import javax.lang.model.element.Element;
 
@@ -27,7 +27,8 @@ import static com.imminentmeals.prestige.codegen.AnnotationProcessor.PRESENTATIO
     this.package_name = package_name;
     this.variable = variable;
     variable_name = variable.getSimpleName() + "";
-    class_name = element_class.substring(package_name.length() + 1) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
+    class_name =
+        element_class.substring(package_name.length() + 1) + PRESENTATION_FRAGMENT_INJECTOR_SUFFIX;
     this.implementation = implementation;
     this.is_manually_created = is_manually_created;
 
@@ -37,9 +38,9 @@ import static com.imminentmeals.prestige.codegen.AnnotationProcessor.PRESENTATIO
       return;
     }
 
-    final ImmutableMap.Builder<Integer, Integer> builder = ImmutableMap.builder();
-    for (int i = 0; i < display_list.length; i += 2) builder.put(display_list[i], display_list[i + 1]);
-    this.displays = builder.build();
+    displays = new HashMap<>(display_list.length);
+    for (int i = 0; i < display_list.length; i += 2)
+      displays.put(display_list[i], display_list[i + 1]);
     this.tag = tag;
   }
 }

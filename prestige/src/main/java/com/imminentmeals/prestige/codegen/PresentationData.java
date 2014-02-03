@@ -4,6 +4,7 @@ import javax.lang.model.element.Element;
 
 /**
  * <p>Container for Presentation data.</p>
+ *
  * @author Dandre Allison
  */
 /* package */class PresentationData {
@@ -14,6 +15,7 @@ import javax.lang.model.element.Element;
 
   /**
    * <p>Constructs a {@link PresentationData}.</p>
+   *
    * @param protocol The Protocol
    * @param implementation The presentation implementation
    */
@@ -22,8 +24,7 @@ import javax.lang.model.element.Element;
     this.implementation = implementation;
   }
 
-  @Override
-  public String toString() {
+  @Override public String toString() {
     return String.format(format, protocol, implementation);
   }
 

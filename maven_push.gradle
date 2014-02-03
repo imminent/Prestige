@@ -71,7 +71,7 @@ afterEvaluate { project ->
   task apiJar(type: Jar) {
     from sourceSets.main.allSource
     classifier = 'api'
-    exclude '**/codegen/**'
+    exclude '**/codegen/**', '**/META-INF/**'
   }
 
   artifacts {

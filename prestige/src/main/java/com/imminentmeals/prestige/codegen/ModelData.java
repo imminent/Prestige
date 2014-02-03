@@ -1,10 +1,12 @@
 package com.imminentmeals.prestige.codegen;
 
-import com.google.common.base.CaseFormat;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.VariableElement;
+
+import static com.imminentmeals.prestige.codegen.utilities.CaseFormat.LOWER_UNDERSCORE;
+import static com.imminentmeals.prestige.codegen.utilities.CaseFormat.UPPER_CAMEL;
 
 /**
  * <p>Container for @Model data, groups the Model interface with its implementation</p>.
@@ -44,17 +46,15 @@ import javax.lang.model.element.VariableElement;
     contract = model;
     this.parameters = parameters;
     variable_name =
-        CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, model.getSimpleName() + "");
+        UPPER_CAMEL.to(LOWER_UNDERSCORE, model.getSimpleName() + "");
     this.should_serialize = should_serialize;
   }
 
-  @Override
-  public int hashCode() {
+  @Override public int hashCode() {
     return contract.hashCode();
   }
 
-  @Override
-  public boolean equals(Object object) {
+  @Override public boolean equals(Object object) {
     if (!(object instanceof ModelData)) return false;
     final ModelData other = (ModelData) object;
     return contract.equals(other.contract)
@@ -62,8 +62,7 @@ import javax.lang.model.element.VariableElement;
         || implementation.equals(other.implementation));
   }
 
-  @Override
-  public String toString() {
+  @Override public String toString() {
     return contract + "";
   }
 }

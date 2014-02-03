@@ -7,17 +7,16 @@ import android.app.Application.ActivityLifecycleCallbacks;
 import android.app.Fragment;
 import android.os.Bundle;
 import com.imminentmeals.prestige.codegen.AnnotationProcessor;
-import com.imminentmeals.prestige.codegen.Finder;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.ParametersAreNonnullByDefault;
 import timber.log.Timber;
 
 import static android.os.Build.VERSION_CODES.HONEYCOMB;
 import static android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH;
-import static com.google.common.collect.Maps.newHashMap;
 import static java.lang.String.format;
 
 /**
@@ -29,30 +28,31 @@ import static java.lang.String.format;
 @SuppressWarnings("UnusedDeclaration") @ParametersAreNonnullByDefault
 public final class Prestige {
 
-  /* package */static final String _TAG = "Prestige";
+  static final String _TAG = "Prestige";
   private static final String _UNABLE_TO_INJECT_DATA_SOURCE_FOR =
       "Unable to inject Data Source for ";
   /** Caches the Model storers previously found to reduce reflection impact */
-  private static final Map<Class<?>, Method> _MODEL_STORERS = newHashMap();
+  private static final Map<Class<?>, Method> _MODEL_STORERS = new HashMap<>();
   /** Caches the Model injects previously found to reduce reflection impact */
-  private static final Map<Class<?>, Method> _MODEL_INJECTORS = newHashMap();
+  private static final Map<Class<?>, Method> _MODEL_INJECTORS = new HashMap<>();
   /** Caches the Data Source injects previously found to reduce reflection impact */
-  private static final Map<Class<?>, Method> _DATA_SOURCE_INJECTORS = newHashMap();
+  private static final Map<Class<?>, Method> _DATA_SOURCE_INJECTORS = new HashMap<>();
   /** Caches the Presentation Fragment injects previously found to reduce reflection impact */
-  private static final Map<Class<?>, Method> _PRESENTATION_FRAGMENT_INJECTORS = newHashMap();
+  private static final Map<Class<?>, Method> _PRESENTATION_FRAGMENT_INJECTORS = new HashMap<>();
   /** Caches the Presentation injects previously found to reduce reflection impact */
-  private static final Map<Class<?>, Method> _PRESENTATION_INJECTORS = newHashMap();
+  private static final Map<Class<?>, Method> _PRESENTATION_INJECTORS = new HashMap<>();
   /** Caches the Presentation Fragment attaches previously found to reduce reflection impact */
-  private static final Map<Class<?>, Method> _ATTACHERS = newHashMap();
+  private static final Map<Class<?>, Method> _ATTACHERS = new HashMap<>();
   private static final String _MESSAGE_SEGUE_CONTROLLER_MISSING =
-      "Attempting to %s before Segue Controller was created " +
-          "(Prestige.conjureSegueController(String)).";
+      "Attempting to %s before Segue Controller was created "
+          + "(Prestige.conjureSegueController(String)).";
   /** Empty method */
   private static final Method _NO_OP = null;
   private static SegueController _segue_controller;
 
   /** <p>Prevents the {@link Prestige} from being constructed.</p> */
-  private Prestige() { }
+  private Prestige() {
+  }
 
   /**
    * <p>Injects a Data Source into the given {@link Activity}.</p>
@@ -61,8 +61,8 @@ public final class Prestige {
    */
   public static void conjureController(Activity activity) {
     if (_segue_controller == null) {
-      throw new IllegalStateException(
-          format(_MESSAGE_SEGUE_CONTROLLER_MISSING, "create controller"));
+      throw new IllegalStateException(format(_MESSAGE_SEGUE_CONTROLLER_MISSING,
+          "create controller"));
     }
     // Creates Controller
     _segue_controller.createController(activity);
@@ -262,7 +262,7 @@ public final class Prestige {
    * @param finder The finder that specifies how to retrieve the Segue Controller from the target
    * @param target The target of the injection
    */
-	/* package */
+  /* package */
   static void injectDataSource(Finder finder, Object target) {
     final Class<?> target_class = target.getClass();
     try {
@@ -329,7 +329,7 @@ public final class Prestige {
    *
    * @param target The target of the injection
    */
-	/* package */
+  /* package */
   static void injectPresentationFragments(Finder finder, int display, Object target) {
     final Class<?> target_class = target.getClass();
     try {
@@ -417,7 +417,7 @@ public final class Prestige {
     }
   }
 
-/* Private Helpers */
+  /* Private Helpers */
   private static void injectModelsForClass(Object target, Class target_class) {
     try {
       final Method inject;
@@ -483,7 +483,8 @@ public final class Prestige {
   }
 
   /**
-   * <p>Indicates an unexpected error occurred while attempting to conjure the Segue Controller.</p>
+   * <p>Indicates an unexpected error occurred while attempting to conjure the Segue
+   * Controller.</p>
    *
    * @author Dandre Allison
    */
@@ -491,6 +492,7 @@ public final class Prestige {
 
     /**
      * <p>Creates an @{link UnableToConjureSegueControllerException}.</p>
+     *
      * @param message The detailed message
      * @param cause The cause of the error
      */

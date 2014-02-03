@@ -4,7 +4,6 @@ apply plugin: 'pmd'
 apply plugin: 'checkstyle'
 
 dependencies {
-  compile 'com.google.guava:guava:15.+'
   compile 'com.google.code.gson:gson:2.2.4'
   compile 'com.google.code.findbugs:annotations:2.+'
   compile 'com.google.android:android:4.0.1.2'
