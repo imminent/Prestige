@@ -191,7 +191,7 @@ public final class Prestige {
 
       @Override
       public void onActivityStopped(Activity activity) {
-        storeController(activity);
+        if (activity.isFinishing()) storeController(activity);
       }
 
       @Override
